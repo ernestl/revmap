@@ -1,0 +1,56 @@
+name: revmap
+title: revmap
+base: core24
+adopt-info: revmap
+summary: Inspect snap revision and version history
+description: |
+  A CLI tool for inspecting the revision and version
+  history of snaps published in the Snap Store.
+confinement: strict
+license: GPL-3.0
+contact: https://github.com/ernestl/revmap/issues
+source-code: https://github.com/ernestl/revmap
+issues: https://github.com/ernestl/revmap/issues
+website: https://github.com/ernestl/revmap#readme
+
+parts:
+  revmap:
+    plugin: nil
+    source: .
+    source-type: git
+    source-depth: 0
+    build-snaps:
+      - go/latest/stable
+    override-pull: |
+      craftctl default
+      if [ -n "${REVMAP_BUILD_DATE:-}" ]; then
+        version="$(./version.sh --with-date)"
+      else
+        version="$(./version.sh)"
+      fi
+      craftctl set version="$version"
+      # Copy pre-built cache into the build tree if it exists in the
+      # source directory (local builds with 'make cache' run beforehand).
+      if [ -d "${CRAFT_PROJECT_DIR}/cache" ]; then
+        cp -r "${CRAFT_PROJECT_DIR}/cache" .
+      fi
+    override-build: |
+      VERSION=$(craftctl get version)
+      CGO_ENABLED=0 go build -ldflags "-X main.version=${VERSION}" -o revmap .
+      mkdir -p ${CRAFT_PART_INSTALL}/bin
+      install -m 755 revmap ${CRAFT_PART_INSTALL}/bin/revmap
+      install -m 755 demo.sh ${CRAFT_PART_INSTALL}/bin/demo.sh
+
+      # Install pre-built cache if available.
+      # To include cache in the snap, run 'make cache' locally before
+      # 'snapcraft' — the override-pull stage copies it into the build tree.
+      if [ -d cache ]; then
+        mkdir -p ${CRAFT_PART_INSTALL}/cache
+        cp cache/*.json.gz ${CRAFT_PART_INSTALL}/cache/
+      fi
+
+apps:
+  revmap:
+    command: bin/revmap
+    plugs:
+      - network

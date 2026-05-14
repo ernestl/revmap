@@ -1,0 +1,6 @@
+revmap
+cache-build
+*.snap
+cache/
+credentials
+credentials.txt
