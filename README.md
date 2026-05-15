@@ -23,14 +23,10 @@ of snaps published in the Snap Store (https://snapcraft.io).
 
     git clone https://github.com/ernestl/snaprev.git
     cd snaprev
-    go build -o snaprev .
+    make
 
-For release builds, set the version at build time:
-
-    go build -ldflags "-X main.version=1.0.0" -o snaprev .
-
-Dev builds show the git commit hash automatically. Check
-the current version with:
+The version is set automatically from the latest git tag.
+Check the current version with:
 
     snaprev --version
 
