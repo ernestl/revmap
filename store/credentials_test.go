@@ -9,21 +9,28 @@ import (
 )
 
 // withTempDataHome sets XDG_DATA_HOME to a temp dir and clears the
-// credentials env var for the duration of the test. It restores
-// original values on cleanup.
+// credentials env var and SNAP_USER_COMMON for the duration of the
+// test. It restores original values on cleanup.
 func withTempDataHome(t *testing.T) string {
 	t.Helper()
 	tmp := t.TempDir()
 	oldData := os.Getenv("XDG_DATA_HOME")
 	oldCreds := os.Getenv(CredentialsEnvVar)
+	oldSnap := os.Getenv("SNAP_USER_COMMON")
 	os.Setenv("XDG_DATA_HOME", tmp)
 	os.Unsetenv(CredentialsEnvVar)
+	os.Unsetenv("SNAP_USER_COMMON")
 	t.Cleanup(func() {
 		os.Setenv("XDG_DATA_HOME", oldData)
 		if oldCreds != "" {
 			os.Setenv(CredentialsEnvVar, oldCreds)
 		} else {
 			os.Unsetenv(CredentialsEnvVar)
+		}
+		if oldSnap != "" {
+			os.Setenv("SNAP_USER_COMMON", oldSnap)
+		} else {
+			os.Unsetenv("SNAP_USER_COMMON")
 		}
 	})
 	return tmp
@@ -248,5 +255,38 @@ func TestLoadCredentialsNoFile(t *testing.T) {
 	_, err := LoadCredentials()
 	if err == nil {
 		t.Fatal("expected error when no credentials exist, got nil")
+	}
+}
+
+func TestCredentialsFilePathSnap(t *testing.T) {
+	tmp := withTempDataHome(t)
+	snapCommon := filepath.Join(tmp, "snap-common")
+	os.MkdirAll(snapCommon, 0700)
+	os.Setenv("SNAP_USER_COMMON", snapCommon)
+
+	// Save credentials — should land in $SNAP_USER_COMMON.
+	err := SaveCredentials("snap-root", "snap-discharge")
+	if err != nil {
+		t.Fatalf("SaveCredentials failed: %v", err)
+	}
+
+	expected := filepath.Join(snapCommon, "credentials.json")
+	if _, err := os.Stat(expected); err != nil {
+		t.Fatalf("credentials not at snap path %s: %v", expected, err)
+	}
+
+	// Verify XDG path was NOT used.
+	xdgPath := filepath.Join(tmp, AppName, "credentials.json")
+	if _, err := os.Stat(xdgPath); err == nil {
+		t.Error("credentials should not exist at XDG path when SNAP_USER_COMMON is set")
+	}
+
+	// Load should read from snap path.
+	creds, err := LoadCredentials()
+	if err != nil {
+		t.Fatalf("LoadCredentials failed: %v", err)
+	}
+	if creds.Root != "snap-root" {
+		t.Errorf("Root = %q, want %q", creds.Root, "snap-root")
 	}
 }

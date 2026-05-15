@@ -11,9 +11,15 @@ of snaps published in the Snap Store (https://snapcraft.io).
 
 ## Installation
 
+### Snap
+
+    sudo snap install snaprev
+
+### Go
+
     go install github.com/ernestl/snaprev@latest
 
-Or build from source:
+### From source
 
     git clone https://github.com/ernestl/snaprev.git
     cd snaprev
@@ -38,6 +44,10 @@ Store. Log in once with your Ubuntu One credentials:
 Credentials are stored at:
 
     ~/.local/share/snaprev/credentials.json
+
+When installed as a snap:
+
+    ~/snap/snaprev/common/credentials.json
 
 This respects XDG_DATA_HOME. Expired discharge macaroons are
 refreshed automatically.

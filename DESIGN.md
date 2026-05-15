@@ -63,7 +63,13 @@ Macaroons are serialized with `base64.RawURLEncoding` (URL-safe, no padding) and
 
 ### Credential Storage
 
-Credentials are stored as JSON at `~/.local/share/snaprev/credentials.json` (or `$XDG_DATA_HOME/snaprev/credentials.json`) with `0600` permissions. The file contains the serialized root and discharge macaroons.
+The credentials file path is resolved with the following priority:
+
+1. `$SNAP_USER_COMMON/credentials.json` -- When running as a snap (strict confinement). This directory persists across snap refreshes, unlike `$SNAP_USER_DATA` which is versioned.
+2. `$XDG_DATA_HOME/snaprev/credentials.json` -- When `XDG_DATA_HOME` is set.
+3. `~/.local/share/snaprev/credentials.json` -- Default.
+
+The file contains JSON with the serialized root and discharge macaroons (`{"r":"...","d":"..."}`), written with `0600` permissions.
 
 The `SNAPREV_STORE_CREDENTIALS` environment variable overrides file-based storage. It auto-detects two formats:
 

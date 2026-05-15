@@ -1,0 +1,25 @@
+name: snaprev
+base: bare
+version: git
+summary: Inspect snap revision and version history
+description: |
+  A CLI tool for inspecting the revision and version
+  history of snaps published in the Snap Store.
+confinement: strict
+
+parts:
+  snaprev:
+    plugin: nil
+    source: .
+    build-snaps:
+      - go/latest/stable
+    override-build: |
+      VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo dev)
+      go build -ldflags "-X main.version=${VERSION}" \
+        -o ${CRAFT_PART_INSTALL}/bin/snaprev .
+
+apps:
+  snaprev:
+    command: bin/snaprev
+    plugs:
+      - network

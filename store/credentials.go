@@ -15,9 +15,13 @@ type Credentials struct {
 	Discharge string `json:"d"`
 }
 
-// credentialsFilePath returns the path to the credentials file,
-// respecting XDG_DATA_HOME.
+// credentialsFilePath returns the path to the credentials file.
+// Inside a snap it uses $SNAP_USER_COMMON (persists across snap
+// refreshes). Otherwise it respects XDG_DATA_HOME.
 func credentialsFilePath() string {
+	if common := os.Getenv("SNAP_USER_COMMON"); common != "" {
+		return filepath.Join(common, "credentials.json")
+	}
 	dataHome := os.Getenv("XDG_DATA_HOME")
 	if dataHome == "" {
 		home, err := os.UserHomeDir()
