@@ -2,7 +2,7 @@ name: snaprev
 title: snaprev
 base: bare
 build-base: core24
-version: git
+adopt-info: snaprev
 summary: Inspect snap revision and version history
 description: |
   A CLI tool for inspecting the revision and version
@@ -18,10 +18,15 @@ parts:
   snaprev:
     plugin: nil
     source: .
+    source-type: git
+    source-depth: 0
     build-snaps:
       - go/latest/stable
+    override-pull: |
+      craftctl default
+      craftctl set version="$(git describe --tags --always --dirty 2>/dev/null || echo dev)"
     override-build: |
-      VERSION=$(git describe --tags --always --dirty 2>/dev/null || echo dev)
+      VERSION=$(craftctl get version)
       CGO_ENABLED=0 go build -ldflags "-X main.version=${VERSION}" \
         -o ${CRAFT_PART_INSTALL}/bin/snaprev .
 
