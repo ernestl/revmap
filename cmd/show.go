@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ernestl/snaprev/store"
+	"github.com/ernestl/revmap/store"
 	"github.com/spf13/cobra"
 )
 
@@ -17,18 +17,18 @@ var showCmd = &cobra.Command{
 	Short: "Show details of a specific snap revision",
 	Long: `Show full details for a specific revision of a snap.
 
-Requires authentication. Run 'snaprev login' first.
+Requires authentication. Run 'revmap login' first.
 
 Examples:
-  snaprev show snapd 17339
-  snaprev show snapd 17339 -f version,status,architectures`,
+  revmap show snapd 17339
+  revmap show snapd 17339 -f version,status,architectures`,
 	Args: cobra.ExactArgs(2),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		snapName := args[0]
 		revision := args[1]
 
 		if !store.CredentialsExist() {
-			return fmt.Errorf("not logged in (run 'snaprev login' first)")
+			return fmt.Errorf("not logged in (run 'revmap login' first)")
 		}
 
 		client := store.NewClient()

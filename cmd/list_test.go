@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ernestl/snaprev/store"
+	"github.com/ernestl/revmap/store"
 )
 
 func TestParseTimeValue(t *testing.T) {

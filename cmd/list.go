@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/ernestl/snaprev/store"
+	"github.com/ernestl/revmap/store"
 	"github.com/spf13/cobra"
 )
 
@@ -101,20 +101,20 @@ var listCmd = &cobra.Command{
 	Short: "List revision history of a snap",
 	Long: `List the revision history of a snap published in the Snap Store.
 
-Requires authentication. Run 'snaprev login' first.
+Requires authentication. Run 'revmap login' first.
 By default only the last 90 days are shown.
 
 Examples:
-  snaprev list snapd
-  snaprev list snapd --since 7d -a amd64
-  snaprev list snapd --since 2024-01-01 --until 2024-06-30
-  snaprev list snapd --all -b release -c revision,version,size`,
+  revmap list snapd
+  revmap list snapd --since 7d -a amd64
+  revmap list snapd --since 2024-01-01 --until 2024-06-30
+  revmap list snapd --all -b release -c revision,version,size`,
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		snapName := args[0]
 
 		if !store.CredentialsExist() {
-			return fmt.Errorf("not logged in (run 'snaprev login' first)")
+			return fmt.Errorf("not logged in (run 'revmap login' first)")
 		}
 
 		// Compile version regex if provided.

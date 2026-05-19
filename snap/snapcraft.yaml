@@ -1,21 +1,21 @@
-name: snaprev
-title: snaprev
+name: revmap
+title: revmap
 base: bare
 build-base: core24
-adopt-info: snaprev
+adopt-info: revmap
 summary: Inspect snap revision and version history
 description: |
   A CLI tool for inspecting the revision and version
   history of snaps published in the Snap Store.
 confinement: strict
 license: GPL-3.0
-contact: https://github.com/ernestl/snaprev/issues
-source-code: https://github.com/ernestl/snaprev
-issues: https://github.com/ernestl/snaprev/issues
-website: https://github.com/ernestl/snaprev#readme
+contact: https://github.com/ernestl/revmap/issues
+source-code: https://github.com/ernestl/revmap
+issues: https://github.com/ernestl/revmap/issues
+website: https://github.com/ernestl/revmap#readme
 
 parts:
-  snaprev:
+  revmap:
     plugin: nil
     source: .
     source-type: git
@@ -28,10 +28,10 @@ parts:
     override-build: |
       VERSION=$(craftctl get version)
       CGO_ENABLED=0 go build -ldflags "-X main.version=${VERSION}" \
-        -o ${CRAFT_PART_INSTALL}/bin/snaprev .
+        -o ${CRAFT_PART_INSTALL}/bin/revmap .
 
 apps:
-  snaprev:
-    command: bin/snaprev
+  revmap:
+    command: bin/revmap
     plugs:
       - network

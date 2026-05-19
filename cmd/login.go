@@ -7,7 +7,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/ernestl/snaprev/store"
+	"github.com/ernestl/revmap/store"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -18,12 +18,12 @@ var loginCmd = &cobra.Command{
 	Long: `Authenticate with the Snap Store using your Ubuntu One SSO
 credentials. Credentials are stored locally for subsequent use.
 
-You can also set the SNAPREV_STORE_CREDENTIALS environment variable
+You can also set the REVMAP_STORE_CREDENTIALS environment variable
 with snapcraft export-login output to skip interactive login.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		if store.CredentialsExist() {
-			fmt.Println("You are already logged in. Run 'snaprev logout' first to re-authenticate.")
+			fmt.Println("You are already logged in. Run 'revmap logout' first to re-authenticate.")
 			return nil
 		}
 

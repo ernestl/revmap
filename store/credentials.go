@@ -68,7 +68,7 @@ func LoadCredentials() (*Credentials, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, fmt.Errorf("no credentials found (use 'snaprev login' first)")
+			return nil, fmt.Errorf("no credentials found (use 'revmap login' first)")
 		}
 		return nil, fmt.Errorf("cannot read credentials file: %w", err)
 	}
@@ -109,7 +109,7 @@ func CredentialsExist() bool {
 //     macaroon = <root>
 //     unbound_discharge = <discharge>
 //
-//  2. Base64-encoded JSON (legacy snaprev format):
+//  2. Base64-encoded JSON (legacy revmap format):
 //     base64({"r":"<root>","d":"<discharge>"})
 func decodeEnvCredentials(value string) (*Credentials, error) {
 	// Try snapcraft INI format first.

@@ -15,7 +15,7 @@ func SetVersion(v string) {
 	}
 	rootCmd.Version = v
 	rootCmd.SetVersionTemplate(
-		fmt.Sprintf("snaprev %s\n", v))
+		fmt.Sprintf("revmap %s\n", v))
 }
 
 // versionFromBuildInfo extracts VCS revision and dirty flag

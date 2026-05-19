@@ -3,7 +3,7 @@ package main
 import (
 	_ "embed"
 
-	"github.com/ernestl/snaprev/cmd"
+	"github.com/ernestl/revmap/cmd"
 )
 
 // version is set at build time via:

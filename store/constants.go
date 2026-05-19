@@ -20,8 +20,8 @@ const (
 	RefreshDischargeAPI = UbuntuOneAPIBase + "/tokens/refresh"
 
 	// AppName is the application name used for credential storage.
-	AppName = "snaprev"
+	AppName = "revmap"
 
 	// CredentialsEnvVar is the environment variable for credential override.
-	CredentialsEnvVar = "SNAPREV_STORE_CREDENTIALS"
+	CredentialsEnvVar = "REVMAP_STORE_CREDENTIALS"
 )

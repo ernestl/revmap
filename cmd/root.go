@@ -8,9 +8,9 @@ import (
 )
 
 var rootCmd = &cobra.Command{
-	Use:   "snaprev",
+	Use:   "revmap",
 	Short: "Inspect snap revision and version history",
-	Long: `snaprev is a CLI tool for inspecting the revision and version
+	Long: `revmap is a CLI tool for inspecting the revision and version
 history of snaps published in the Snap Store.`,
 	SilenceUsage:  true,
 	SilenceErrors: true,

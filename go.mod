@@ -1,4 +1,4 @@
-module github.com/ernestl/snaprev
+module github.com/ernestl/revmap
 
 go 1.25.0
 

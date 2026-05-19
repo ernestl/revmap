@@ -1,15 +1,15 @@
 # Design
 
-This document describes the architecture and key design decisions behind snaprev.
+This document describes the architecture and key design decisions behind revmap.
 
 ## Overview
 
-snaprev is a read-only CLI tool that queries the Snap Store's dashboard API to display revision and version history for published snaps. It authenticates using the same macaroon-based scheme as snapcraft.
+revmap is a read-only CLI tool that queries the Snap Store's dashboard API to display revision and version history for published snaps. It authenticates using the same macaroon-based scheme as snapcraft.
 
 ## Project Structure
 
 ```
-snaprev/
+revmap/
   main.go                 Entry point; embeds README, sets version via ldflags
   cmd/
     root.go               Root Cobra command
@@ -39,9 +39,9 @@ snaprev/
 
 The binary version is set via one of two mechanisms:
 
-1. **ldflags (release builds)** -- `go build -ldflags "-X main.version=1.0.0"` sets a package-level `version` variable in `main.go`, which is passed to `cmd.SetVersion()`. Output: `snaprev 1.0.0`.
+1. **ldflags (release builds)** -- `go build -ldflags "-X main.version=1.0.0"` sets a package-level `version` variable in `main.go`, which is passed to `cmd.SetVersion()`. Output: `revmap 1.0.0`.
 
-2. **VCS build info (dev builds)** -- When `version` is empty, `runtime/debug.ReadBuildInfo()` extracts the git commit hash (`vcs.revision`) and dirty flag (`vcs.modified`). Output: `snaprev dev (abc1234)` or `snaprev dev (abc1234, dirty)`.
+2. **VCS build info (dev builds)** -- When `version` is empty, `runtime/debug.ReadBuildInfo()` extracts the git commit hash (`vcs.revision`) and dirty flag (`vcs.modified`). Output: `revmap dev (abc1234)` or `revmap dev (abc1234, dirty)`.
 
 Cobra's built-in `Version` field provides the `--version` flag automatically.
 
@@ -66,16 +66,16 @@ Macaroons are serialized with `base64.RawURLEncoding` (URL-safe, no padding) and
 The credentials file path is resolved with the following priority:
 
 1. `$SNAP_USER_COMMON/credentials.json` -- When running as a snap (strict confinement). This directory persists across snap refreshes, unlike `$SNAP_USER_DATA` which is versioned.
-2. `$XDG_DATA_HOME/snaprev/credentials.json` -- When `XDG_DATA_HOME` is set.
-3. `~/.local/share/snaprev/credentials.json` -- Default.
+2. `$XDG_DATA_HOME/revmap/credentials.json` -- When `XDG_DATA_HOME` is set.
+3. `~/.local/share/revmap/credentials.json` -- Default.
 
 The file contains JSON with the serialized root and discharge macaroons (`{"r":"...","d":"..."}`), written with `0600` permissions.
 
-The `SNAPREV_STORE_CREDENTIALS` environment variable overrides file-based storage. It auto-detects two formats:
+The `REVMAP_STORE_CREDENTIALS` environment variable overrides file-based storage. It auto-detects two formats:
 
 1. **Snapcraft export format** -- The INI-style output from `snapcraft export-login`, containing `macaroon` and `unbound_discharge` fields under `[login.ubuntu.com]`. This is the recommended approach for CI pipelines.
 
-2. **Base64-encoded JSON** -- Standard base64 encoding of the credentials JSON file (`{"r":"...","d":"..."}`). Useful for encoding the file snaprev itself creates.
+2. **Base64-encoded JSON** -- Standard base64 encoding of the credentials JSON file (`{"r":"...","d":"..."}`). Useful for encoding the file revmap itself creates.
 
 ### Auto-Refresh
 

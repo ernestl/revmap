@@ -3,7 +3,7 @@ package cmd
 import (
 	"fmt"
 
-	"github.com/ernestl/snaprev/store"
+	"github.com/ernestl/revmap/store"
 	"github.com/spf13/cobra"
 )
 
