@@ -118,7 +118,7 @@ Revisions are deduplicated by revision number across pages.
 
 Fetches paginated revision data and displays it as a fixed-width table.
 
-**Time window parsing** (`parseTimeWindow`): Combines `--since`, `--until`, `--limit`, and `--all` flags into a `FetchOptions` struct. Validates mutual exclusivity (`--all` vs `--since`/`--until`) and ensures `--since` is before `--until`. Defaults to 90 days when no time flags are given.
+**Time window parsing** (`parseTimeWindow`): Combines `--since`, `--until`, `--limit`, and `--all` flags into a `FetchOptions` struct. Validates mutual exclusivity (`--all` vs `--since`/`--until`) and ensures `--since` is before `--until`. Defaults to 90 days when no scope flags are given. When `--limit` is set without explicit time bounds, the 90-day default is bypassed and all pages are fetched until the count limit is reached.
 
 **Relative time values** (`parseTimeValue`): Accepts `Nd`, `Nw`, `Nm`, `Ny` for relative durations and `yyyy-mm-dd` for absolute dates. `--until` dates are made inclusive by adding `24h - 1s`.
 
@@ -127,13 +127,13 @@ Fetches paginated revision data and displays it as a fixed-width table.
 - `--arch` / `-a` -- Case-insensitive architecture match
 - `--status` / `-s` -- Case-insensitive status match
 - `--version` -- Case-insensitive regex match against version string
-- `--build` / `-b` -- Build type classification:
+- `--build` / `-b` -- Build type classification (preset or custom regex):
   - `release` -- No `+` or `~` suffix (e.g. `2.75.2`)
-  - `git` -- Has `+g`/`+git` suffix, excluding fips/dirty/pre/rc
+  - `git` -- Has `+g`/`+git` suffix, excluding fips/dirty/pre
   - `fips` -- Contains `+fips`
-  - `pre` -- Contains `~pre`
-  - `rc` -- Contains `~rc`
+  - `pre` -- Contains `~pre` or `~rc`
   - `dirty` -- Contains `-dirty`
+  - Any other value -- Treated as a case-insensitive regex matched against the version string
 
 **Column system** (`resolveColumns`): A registry of column definitions (`allColumns` map), each with a header string, a value extractor function, and a fixed/shrinkable flag. The `--columns` / `-c` flag selects and orders columns.
 

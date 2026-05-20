@@ -68,7 +68,8 @@ type FetchOptions struct {
 	// Zero value means no upper time limit.
 	Until time.Time
 
-	// FetchAll overrides both MaxRevisions and Since, fetching every page.
+	// FetchAll fetches every page (subject to MaxRevisions count limit).
+	// Set automatically when --limit is used without explicit time bounds.
 	FetchAll bool
 }
 

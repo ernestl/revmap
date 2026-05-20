@@ -13,16 +13,17 @@ import (
 )
 
 var (
-	filterArch   string
-	filterVer    string
-	filterVerRe  *regexp.Regexp
-	filterStatus string
-	filterBuild  string
-	since        string
-	until        string
-	limit        int
-	fetchAll     bool
-	columns      string
+	filterArch    string
+	filterVer     string
+	filterVerRe   *regexp.Regexp
+	filterStatus  string
+	filterBuild   string
+	filterBuildRe *regexp.Regexp
+	since         string
+	until         string
+	limit         int
+	fetchAll      bool
+	columns       string
 )
 
 // column defines a table column with its header and value extractor.
@@ -102,7 +103,9 @@ var listCmd = &cobra.Command{
 	Long: `List the revision history of a snap published in the Snap Store.
 
 Requires authentication. Run 'revmap login' first.
-By default only the last 90 days are shown.
+By default only the last 90 days are shown. Use --all to fetch
+complete history, or --limit/-n to fetch up to a specific number
+of revisions across all pages.
 
 Examples:
   revmap list snapd
@@ -124,6 +127,15 @@ Examples:
 				return fmt.Errorf("invalid --version regex %q: %v", filterVer, err)
 			}
 			filterVerRe = re
+		}
+
+		// Compile build filter as regex if it's not a preset type.
+		if filterBuild != "" && !isPresetBuildType(filterBuild) {
+			re, err := regexp.Compile("(?i)" + filterBuild)
+			if err != nil {
+				return fmt.Errorf("invalid --build regex %q: %v", filterBuild, err)
+			}
+			filterBuildRe = re
 		}
 
 		client := store.NewClient()
@@ -222,9 +234,13 @@ func parseTimeWindow(sinceVal, untilVal string, limitVal int, all bool) (store.F
 			return store.FetchOptions{}, err
 		}
 		opts.Since = t
-	} else if untilVal == "" {
-		// Default: 90 days when neither --since nor --until is set.
+	} else if untilVal == "" && limitVal == 0 {
+		// Default: 90 days when neither --since, --until, nor --limit is set.
 		opts.Since = time.Now().AddDate(0, 0, -90)
+	} else if untilVal == "" && limitVal > 0 {
+		// --limit without time bounds: follow all pages until the count
+		// limit is reached (--limit implies --all for pagination).
+		opts.FetchAll = true
 	} else {
 		// --until without --since: fetch all pages up to the cutoff.
 		opts.FetchAll = true
@@ -317,14 +333,15 @@ func matchesFilters(rev store.RevisionEntry) bool {
 }
 
 // matchesBuildType checks whether a version string matches the requested
-// build type. Recognised types:
+// build type. Recognised preset types:
 //
 //	release - base version only, no "+" or "~" suffix (e.g. "2.75.2")
-//	git     - has +g or +git suffix, excluding fips/dirty/pre/rc (e.g. "2.75.2+g307.abc")
+//	git     - has +g or +git suffix, excluding fips/dirty/pre (e.g. "2.75.2+g307.abc")
 //	fips    - has +fips anywhere in the version (e.g. "2.75.2+g307.abc+fips")
-//	pre     - pre-release builds with ~pre (e.g. "2.63~pre1+git10.g930660d")
-//	rc      - release candidates with ~rc (e.g. "2.54~rc1")
+//	pre     - pre-release builds with ~pre or ~rc (e.g. "2.63~pre1+git10.g930660d", "2.54~rc1")
 //	dirty   - builds from uncommitted trees with -dirty (e.g. "2.38+git4.g7de2afe-dirty")
+//
+// Any other value is treated as a custom regex matched against the version.
 func matchesBuildType(version, buildType string) bool {
 	ver := strings.ToLower(version)
 	switch strings.ToLower(buildType) {
@@ -334,20 +351,30 @@ func matchesBuildType(version, buildType string) bool {
 		hasGit := strings.Contains(ver, "+g") || strings.Contains(ver, "+git")
 		hasFips := strings.Contains(ver, "+fips")
 		hasDirty := strings.Contains(ver, "-dirty")
-		hasPre := strings.Contains(ver, "~pre")
-		hasRC := strings.Contains(ver, "~rc")
-		return hasGit && !hasFips && !hasDirty && !hasPre && !hasRC
+		hasPre := strings.Contains(ver, "~pre") || strings.Contains(ver, "~rc")
+		return hasGit && !hasFips && !hasDirty && !hasPre
 	case "fips":
 		return strings.Contains(ver, "+fips")
 	case "pre":
-		return strings.Contains(ver, "~pre")
-	case "rc":
-		return strings.Contains(ver, "~rc")
+		return strings.Contains(ver, "~pre") || strings.Contains(ver, "~rc")
 	case "dirty":
 		return strings.Contains(ver, "-dirty")
 	default:
+		// Custom regex (compiled in RunE).
+		if filterBuildRe != nil {
+			return filterBuildRe.MatchString(version)
+		}
 		return true
 	}
+}
+
+// isPresetBuildType returns true if the value matches a known preset build type.
+func isPresetBuildType(value string) bool {
+	switch strings.ToLower(value) {
+	case "release", "git", "fips", "pre", "dirty":
+		return true
+	}
+	return false
 }
 
 // containsArch checks if the architecture list contains the given value
@@ -474,14 +501,14 @@ func init() {
 	// Scope.
 	listCmd.Flags().StringVar(&since, "since", "", "start of time window (Nd, Nw, Nm, Ny, or yyyy-mm-dd; default 90d)")
 	listCmd.Flags().StringVar(&until, "until", "", "end of time window (Nd, Nw, Nm, Ny, or yyyy-mm-dd)")
-	listCmd.Flags().IntVarP(&limit, "limit", "n", 0, "maximum number of revisions to return")
+	listCmd.Flags().IntVarP(&limit, "limit", "n", 0, "maximum number of revisions to return (fetches all pages)")
 	listCmd.Flags().BoolVar(&fetchAll, "all", false, "fetch the complete revision history")
 
 	// Filters.
 	listCmd.Flags().StringVarP(&filterArch, "arch", "a", "", "filter by architecture (e.g. amd64, arm64)")
 	listCmd.Flags().StringVarP(&filterStatus, "status", "s", "", "filter by status (e.g. Published)")
 	listCmd.Flags().StringVar(&filterVer, "version", "", "filter by version (regex, e.g. '2\\.75\\.2$' or 'fips')")
-	listCmd.Flags().StringVarP(&filterBuild, "build", "b", "", "filter by build type: release, git, fips, pre, rc, dirty")
+	listCmd.Flags().StringVarP(&filterBuild, "build", "b", "", "filter by build type (release, git, fips, pre, dirty) or custom regex")
 
 	// Display.
 	listCmd.Flags().StringVarP(&columns, "columns", "c", defaultColumns, "comma-separated list of columns to display")

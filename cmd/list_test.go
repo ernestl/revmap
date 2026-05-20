@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -206,11 +207,17 @@ func TestParseTimeWindow(t *testing.T) {
 			},
 		},
 		{
-			name:  "limit standalone",
+			name:  "limit standalone implies fetch all",
 			limit: 100,
 			check: func(t *testing.T, opts store.FetchOptions) {
 				if opts.MaxRevisions != 100 {
 					t.Errorf("expected MaxRevisions=100, got %d", opts.MaxRevisions)
+				}
+				if !opts.FetchAll {
+					t.Error("expected FetchAll to be true when --limit is set without time bounds")
+				}
+				if !opts.Since.IsZero() {
+					t.Error("expected Since to be zero when --limit implies fetch all")
 				}
 			},
 		},
@@ -328,21 +335,18 @@ func TestMatchesBuildType(t *testing.T) {
 		{"2.75.2+g307.abc+fips", "fips", true},
 		{"2.75.2+g307.abc", "fips", false},
 
-		// pre
+		// pre (includes ~rc)
 		{"2.50~pre1+git10.g930660d", "pre", true},
 		{"2.34~pre1", "pre", true},
+		{"2.54~rc1", "pre", true},
+		{"2.49~rc1+git942.g47f5210", "pre", true},
 		{"2.75.2", "pre", false},
-
-		// rc
-		{"2.54~rc1", "rc", true},
-		{"2.49~rc1+git942.g47f5210", "rc", true},
-		{"2.75.2", "rc", false},
 
 		// dirty
 		{"2.38+git4.g7de2afe-dirty", "dirty", true},
 		{"2.75.2+g307.abc", "dirty", false},
 
-		// unknown build type matches everything
+		// unknown build type with no regex matches everything
 		{"2.75.2", "unknown", true},
 
 		// case insensitive
@@ -356,6 +360,33 @@ func TestMatchesBuildType(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("matchesBuildType(%q, %q) = %v, want %v",
 					tt.version, tt.buildType, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestMatchesBuildTypeCustomRegex(t *testing.T) {
+	// Set the package-level regex to simulate --build with a custom pattern.
+	filterBuildRe = regexp.MustCompile(`(?i)\+g\d+\..*\+fips`)
+	defer func() { filterBuildRe = nil }()
+
+	tests := []struct {
+		version string
+		want    bool
+	}{
+		{"2.75.2+g307.abc+fips", true},
+		{"2.75.2+g42.xyz+FIPS", true},
+		{"2.75.2+g307.abc", false},
+		{"2.75.2", false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.version, func(t *testing.T) {
+			// Use a non-preset build type to trigger regex path.
+			got := matchesBuildType(tt.version, "custom-pattern")
+			if got != tt.want {
+				t.Errorf("matchesBuildType(%q, custom regex) = %v, want %v",
+					tt.version, got, tt.want)
 			}
 		})
 	}

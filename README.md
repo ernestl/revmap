@@ -89,6 +89,8 @@ List the revision history of a snap:
     revmap list <snap>
 
 By default, only revisions from the last 90 days are shown.
+Use --all to fetch complete history, or --limit/-n to fetch
+up to a specific number of revisions across all pages.
 
 Time window:
 
@@ -107,11 +109,13 @@ Row filters:
     revmap list snapd --version '2\.75' # version regex
     revmap list snapd -b release        # build type
 
-Build types: release, git, fips, pre, rc, dirty.
+Build types: release, git, fips, pre, dirty.
+Any other value is treated as a custom regex matched against
+the version string (e.g. -b '^\d+\.\d+$').
 
 Display options:
 
-    revmap list snapd -n 50             # limit results
+    revmap list snapd -n 50             # limit to 50 (fetches all pages)
     revmap list snapd -c revision,version,arch,size
 
 Available columns: revision, version, arch, status, created,
