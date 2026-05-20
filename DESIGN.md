@@ -222,7 +222,7 @@ Not tested (require integration/real API): `store/revisions.go` (HTTP client met
 
 ## Snap Packaging
 
-The snap is built with `snapcraft` using `base: bare` (no runtime base snap) and `confinement: strict`. The build process:
+The snap is built with `snapcraft` using `base: core24` (Ubuntu 24.04 runtime) and `confinement: strict`. The build process:
 
 **`override-pull`:**
 1. Clones from git (LP) or copies local source

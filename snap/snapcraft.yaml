@@ -1,7 +1,6 @@
 name: revmap
 title: revmap
-base: bare
-build-base: core24
+base: core24
 adopt-info: revmap
 summary: Inspect snap revision and version history
 description: |
