@@ -21,5 +21,3 @@ var readmeCmd = &cobra.Command{
 		fmt.Print(embeddedReadme)
 	},
 }
-
-

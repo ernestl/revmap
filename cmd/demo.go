@@ -75,5 +75,3 @@ func findDemoScript() string {
 
 	return ""
 }
-
-

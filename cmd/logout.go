@@ -26,5 +26,3 @@ var logoutCmd = &cobra.Command{
 		return nil
 	},
 }
-
-

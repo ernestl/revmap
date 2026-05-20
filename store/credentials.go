@@ -236,6 +236,7 @@ func resolveExportPath(path string) string {
 	}
 	return path
 }
+
 // produced by "snapcraft export-login". The expected format is:
 //
 //	[login.ubuntu.com]

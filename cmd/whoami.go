@@ -82,5 +82,3 @@ func truncateSnap(name string, maxLen int) string {
 	}
 	return strings.TrimRight(name[:maxLen-3], "-") + "..."
 }
-
-

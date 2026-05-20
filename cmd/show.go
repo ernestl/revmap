@@ -97,8 +97,6 @@ func parseFieldList(fieldList string) []string {
 	return result
 }
 
-
-
 // showFromCache attempts to serve the show request from the
 // pre-built cache. If no cache is available, it returns an error
 // with the given reason context.
