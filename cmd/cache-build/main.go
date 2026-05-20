@@ -31,7 +31,22 @@ func run(workers int) error {
 		email := os.Getenv("REVMAP_EMAIL")
 		password := os.Getenv("REVMAP_PASSWORD")
 		if email == "" || password == "" {
-			return fmt.Errorf("not logged in (run 'revmap login' first, or set REVMAP_EMAIL and REVMAP_PASSWORD)")
+			fmt.Fprintln(os.Stderr, "Error: no store credentials available.")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "To authenticate, use one of the following methods:")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "  1. Set SNAPCRAFT_STORE_CREDENTIALS (recommended for CI):")
+			fmt.Fprintln(os.Stderr, "     export SNAPCRAFT_STORE_CREDENTIALS=$(cat credentials.txt)")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "  2. Set REVMAP_EMAIL and REVMAP_PASSWORD (non-2FA account):")
+			fmt.Fprintln(os.Stderr, "     export REVMAP_EMAIL=user@example.com")
+			fmt.Fprintln(os.Stderr, "     export REVMAP_PASSWORD=secret")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "  3. Run 'revmap login' first to store credentials locally.")
+			fmt.Fprintln(os.Stderr, "")
+			fmt.Fprintln(os.Stderr, "For GitHub Actions, add the secret SNAPCRAFT_STORE_CREDENTIALS")
+			fmt.Fprintln(os.Stderr, "to your repository (Settings > Secrets and variables > Actions).")
+			return fmt.Errorf("credentials not configured")
 		}
 		fmt.Println("Authenticating via environment credentials...")
 		if err := store.Login(email, password, ""); err != nil {

@@ -22,7 +22,7 @@ jobs:
 
       - run: make cache
         env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.STORE_CREDENTIALS }}
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
 
       - uses: snapcore/action-build@v1
         id: build
@@ -32,4 +32,4 @@ jobs:
           snap: ${{ steps.build.outputs.snap }}
           release: edge
         env:
-          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.STORE_CREDENTIALS }}
+          SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
