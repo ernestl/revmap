@@ -23,9 +23,10 @@ parts:
       - go/latest/stable
     override-pull: |
       craftctl default
-      version="$(./version.sh)"
       if [ -n "${REVMAP_BUILD_DATE:-}" ]; then
-        version="${version}+${REVMAP_BUILD_DATE}"
+        version="$(./version.sh --with-date)"
+      else
+        version="$(./version.sh)"
       fi
       craftctl set version="$version"
       # Copy pre-built cache into the build tree if it exists in the

@@ -24,14 +24,10 @@ jobs:
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}
 
-      - name: Get build date
-        id: date
-        run: echo "date=$(date +%d-%m-%Y)" >> "$GITHUB_OUTPUT"
-
       - uses: snapcore/action-build@v1
         id: build
         env:
-          REVMAP_BUILD_DATE: ${{ steps.date.outputs.date }}
+          REVMAP_BUILD_DATE: "1"
 
       - uses: snapcore/action-publish@v1
         with:

@@ -67,7 +67,7 @@ func RequestStoreMacaroon(httpClient *http.Client) (string, error) {
 	const errPrefix = "cannot get snap access permission from store: "
 
 	data := map[string]interface{}{
-		"permissions": []string{"package_access"},
+		"permissions": []string{"package_access", "package_push", "package_release"},
 	}
 	body, err := json.Marshal(data)
 	if err != nil {
