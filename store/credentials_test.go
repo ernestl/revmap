@@ -6,6 +6,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"gopkg.in/macaroon.v1"
 )
 
 // withTempDataHome sets XDG_DATA_HOME to a temp dir and clears the
@@ -288,5 +290,100 @@ func TestCredentialsFilePathSnap(t *testing.T) {
 	}
 	if creds.Root != "snap-root" {
 		t.Errorf("Root = %q, want %q", creds.Root, "snap-root")
+	}
+}
+
+func TestCredentialsExpiry(t *testing.T) {
+	withTempDataHome(t)
+
+	// Create a macaroon with a time-before caveat.
+	m, err := macaroon.New([]byte("key"), "id", "location")
+	if err != nil {
+		t.Fatalf("cannot create macaroon: %v", err)
+	}
+	err = m.AddFirstPartyCaveat("time-before 2027-06-15T12:00:00.000000")
+	if err != nil {
+		t.Fatalf("cannot add caveat: %v", err)
+	}
+
+	root, err := MacaroonSerialize(m)
+	if err != nil {
+		t.Fatalf("cannot serialize macaroon: %v", err)
+	}
+
+	if err := SaveCredentials(root, "discharge-placeholder"); err != nil {
+		t.Fatalf("SaveCredentials failed: %v", err)
+	}
+
+	expires, err := CredentialsExpiry()
+	if err != nil {
+		t.Fatalf("CredentialsExpiry failed: %v", err)
+	}
+	if expires.IsZero() {
+		t.Fatal("expected non-zero expiry time")
+	}
+	if expires.Year() != 2027 || expires.Month() != 6 || expires.Day() != 15 {
+		t.Errorf("unexpected expiry: %v", expires)
+	}
+}
+
+func TestCredentialsExpiryStoreFormat(t *testing.T) {
+	withTempDataHome(t)
+
+	// Create a macaroon with the Snap Store pipe-delimited expiry caveat.
+	m, err := macaroon.New([]byte("key"), "id", "location")
+	if err != nil {
+		t.Fatalf("cannot create macaroon: %v", err)
+	}
+	err = m.AddFirstPartyCaveat("myapps.developer.ubuntu.com|expires|2027-05-20T20:30:22.896621")
+	if err != nil {
+		t.Fatalf("cannot add caveat: %v", err)
+	}
+
+	root, err := MacaroonSerialize(m)
+	if err != nil {
+		t.Fatalf("cannot serialize macaroon: %v", err)
+	}
+
+	if err := SaveCredentials(root, "discharge-placeholder"); err != nil {
+		t.Fatalf("SaveCredentials failed: %v", err)
+	}
+
+	expires, err := CredentialsExpiry()
+	if err != nil {
+		t.Fatalf("CredentialsExpiry failed: %v", err)
+	}
+	if expires.IsZero() {
+		t.Fatal("expected non-zero expiry time")
+	}
+	if expires.Year() != 2027 || expires.Month() != 5 || expires.Day() != 20 {
+		t.Errorf("unexpected expiry: %v", expires)
+	}
+}
+
+func TestCredentialsExpiryNoCaveat(t *testing.T) {
+	withTempDataHome(t)
+
+	// Create a macaroon without a time-before caveat.
+	m, err := macaroon.New([]byte("key"), "id", "location")
+	if err != nil {
+		t.Fatalf("cannot create macaroon: %v", err)
+	}
+
+	root, err := MacaroonSerialize(m)
+	if err != nil {
+		t.Fatalf("cannot serialize macaroon: %v", err)
+	}
+
+	if err := SaveCredentials(root, "discharge-placeholder"); err != nil {
+		t.Fatalf("SaveCredentials failed: %v", err)
+	}
+
+	expires, err := CredentialsExpiry()
+	if err != nil {
+		t.Fatalf("CredentialsExpiry failed: %v", err)
+	}
+	if !expires.IsZero() {
+		t.Errorf("expected zero expiry for macaroon without time-before, got %v", expires)
 	}
 }

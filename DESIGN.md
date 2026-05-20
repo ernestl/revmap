@@ -17,20 +17,24 @@ revmap/
   cmd/
     root.go               Root Cobra command
     version.go            Version resolution (ldflags or VCS fallback)
-    login.go              Interactive login flow
+    login.go              Interactive login flow with credential export
     logout.go             Credential removal
     list.go               Revision listing with filters and table output
     show.go               Single revision detail view
+    whoami.go             Account information display
     cache.go              Cache-build subcommand (pre-build cache generation)
     demo.go               Demo subcommand (runs demo.sh)
     readme.go             Embedded README display
     list_test.go           Tests for list logic
     show_test.go           Tests for show logic
     version_test.go        Tests for version logic
+  cmd/cache-build/
+    main.go               Standalone cache-build binary (separate main package)
   store/
     constants.go          API URLs and app-wide constants
     auth.go               Macaroon serialization, SSO discharge, login flow
     credentials.go        File-based credential storage with env var override
+    account.go            Account info retrieval (whoami endpoint)
     client.go             Authenticated HTTP client with auto-refresh
     revisions.go          Store API calls (revisions, releases with pagination)
     cache.go              Cache data structures, gzip read/write, file lookup
@@ -43,11 +47,11 @@ revmap/
 
 ### Version
 
-The binary version is set via one of two mechanisms:
+The project produces two binaries (`revmap` and `cache-build`), both receiving the same version via ldflags at build time.
 
-1. **ldflags (release builds)** -- `go build -ldflags "-X main.version=1.0.0"` sets a package-level `version` variable in `main.go`, which is passed to `cmd.SetVersion()`. Output: `revmap 1.0.0`.
+1. **ldflags (release builds)** -- `go build -ldflags "-X main.version=1.0.0"` sets a package-level `version` variable in each binary's `main.go`. For `revmap`, this is passed to `cmd.SetVersion()`. Output: `revmap 1.0.0` / `cache-build 1.0.0`.
 
-2. **VCS build info (dev builds)** -- When `version` is empty, `runtime/debug.ReadBuildInfo()` extracts the git commit hash (`vcs.revision`) and dirty flag (`vcs.modified`). Output: `revmap dev (abc1234)` or `revmap dev (abc1234, dirty)`.
+2. **VCS build info (dev builds)** -- When `version` is empty, `revmap` uses `runtime/debug.ReadBuildInfo()` to extract the git commit hash (`vcs.revision`) and dirty flag (`vcs.modified`). Output: `revmap dev (abc1234)` or `revmap dev (abc1234, dirty)`. The `cache-build` binary displays `cache-build dev` when version is unset.
 
 Cobra's built-in `Version` field provides the `--version` flag automatically.
 
@@ -82,6 +86,18 @@ The `SNAPCRAFT_STORE_CREDENTIALS` environment variable overrides file-based stor
 1. **Snapcraft export format** -- The INI-style output from `snapcraft export-login`, containing `macaroon` and `unbound_discharge` fields under `[login.ubuntu.com]`. This is the recommended approach for CI pipelines.
 
 2. **Base64-encoded JSON** -- Standard base64 encoding of the credentials JSON file (`{"r":"...","d":"..."}`). Useful for encoding the file revmap itself creates.
+
+### Credential Export
+
+The `login --export <file>` flag writes stored credentials to a file in the snapcraft INI format (`[login.ubuntu.com]\nmacaroon = ...\nunbound_discharge = ...`), compatible with `SNAPCRAFT_STORE_CREDENTIALS`. If the user is already logged in, the existing credentials are exported without re-authenticating. If not yet logged in, the interactive login flow runs first, then the credentials are exported.
+
+**Path resolution** (`resolveExportPath`):
+
+- **Absolute paths** -- Used as-is regardless of environment.
+- **Relative paths (snap)** -- When `$SNAP_USER_COMMON` is set (running inside the snap), relative paths are resolved under `$SNAP_USER_COMMON` (e.g. `credentials.txt` becomes `~/snap/revmap/common/credentials.txt`). This is necessary because strict confinement prevents writing to arbitrary directories.
+- **Relative paths (non-snap)** -- Resolved from the current working directory as usual.
+
+The resolved path is displayed to the user after export so they know exactly where the file was written.
 
 ### Auto-Refresh
 
@@ -151,9 +167,17 @@ Default columns: `revision,version,arch,status,created`. Additional: `confinemen
 
 Fetches a single revision by number and outputs the JSON response. The `--fields` / `-f` flag filters to specific fields from the nested `revision` object.
 
+### whoami
+
+Queries the store's account endpoint (`GET /dev/api/account`) to display the authenticated user's email, username, and registered snap names. Snaps are filtered to `status == "Approved"` in the default series (`16`), sorted alphabetically, and displayed in a 3-column grid truncated to fit within 80 characters.
+
+If no credentials are available, prints an error directing the user to `revmap login` or the `SNAPCRAFT_STORE_CREDENTIALS` environment variable.
+
 ### cache-build
 
-Fetches the complete revision history and individual revision details for all snaps listed in `cache-snaps.json`, writing compressed cache files to `cache/`.
+A standalone binary (`cmd/cache-build/main.go`) that fetches the complete revision history and individual revision details for all snaps listed in `cache-snaps.json`, writing compressed cache files to `cache/`. It is a separate `main` package so it can be built independently and is not included in the revmap snap.
+
+Built by `make build` alongside the main binary, with the same version injected via ldflags. Supports `-version` to print its version.
 
 **Authentication:** If credentials already exist (user ran `revmap login` or `SNAPCRAFT_STORE_CREDENTIALS` is set), they are used directly. Otherwise, `cache-build` checks for `REVMAP_EMAIL` and `REVMAP_PASSWORD` environment variables and performs a non-interactive login via `store.Login(email, password, "")`. The OTP parameter is always empty — the account must not have two-factor authentication enabled. A 2FA-enabled account will return `ErrTwoFactorRequired`, surfaced as `"automatic login failed: two-factor authentication required"`.
 
@@ -211,6 +235,17 @@ Tests focus on pure logic functions that don't require network access or interac
 - **`store/client_test.go`** -- Refresh detection across JSON variants (underscore vs hyphen keys, multiple errors, empty/invalid bodies)
 
 Not tested (require integration/real API): `store/revisions.go` (HTTP client methods), `cmd/login.go`/`cmd/logout.go` (interactive I/O), `main.go`.
+
+## User Messages
+
+All user-facing messages follow consistent conventions:
+
+| Type | Style | Example |
+|---|---|---|
+| Informational (stdout) | Sentence case, ends with period | `"Credentials cleared."` |
+| Errors (stderr) | Prefixed with `error: `, lowercase, no period | `"error: not logged in (use 'revmap login'...)"` |
+| Notices/banners | No period (followed by output) | `"Using cached data from %s (%s)\n\n"` |
+| Progress | Ends with ellipsis | `"Authenticating via environment credentials..."` |
 
 ## Dependencies
 

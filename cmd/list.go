@@ -596,23 +596,4 @@ func truncate(s string, maxLen int) string {
 	return s[:maxLen-3] + "..."
 }
 
-func init() {
-	listCmd.Flags().SortFlags = false
 
-	// Scope.
-	listCmd.Flags().StringVar(&since, "since", "", "start of time window (Nd, Nw, Nm, Ny, or yyyy-mm-dd; default 90d)")
-	listCmd.Flags().StringVar(&until, "until", "", "end of time window (Nd, Nw, Nm, Ny, or yyyy-mm-dd)")
-	listCmd.Flags().IntVarP(&limit, "limit", "n", 0, "maximum number of revisions to return (fetches all pages)")
-	listCmd.Flags().BoolVar(&fetchAll, "all", false, "fetch the complete revision history")
-
-	// Filters.
-	listCmd.Flags().StringVarP(&filterArch, "arch", "a", "", "filter by architecture (e.g. amd64, arm64)")
-	listCmd.Flags().StringVarP(&filterStatus, "status", "s", "", "filter by status (e.g. Published)")
-	listCmd.Flags().StringVar(&filterVer, "version", "", "filter by version (regex, e.g. '2\\.75\\.2$' or 'fips')")
-	listCmd.Flags().StringVarP(&filterBuild, "build", "b", "", "filter by build type (release, git, fips, pre, dirty) or custom regex")
-
-	// Display.
-	listCmd.Flags().StringVarP(&columns, "columns", "c", defaultColumns, "comma-separated list of columns to display")
-
-	rootCmd.AddCommand(listCmd)
-}

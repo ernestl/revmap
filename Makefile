@@ -1,19 +1,13 @@
-TAG ?= $(shell git describe --tags --abbrev=0 2>/dev/null || echo 0.0.0)
-EXACT_TAG := $(shell git describe --tags --exact-match HEAD 2>/dev/null)
-COMMIT := $(shell git rev-parse --short HEAD 2>/dev/null)
-ifdef EXACT_TAG
-  VERSION ?= $(TAG)
-else
-  VERSION ?= $(TAG)+$(COMMIT)
-endif
+VERSION ?= $(shell ./version.sh)
 
 .PHONY: build clean test check cache
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o revmap .
+	go build -ldflags "-X main.version=$(VERSION)" -o cache-build ./cmd/cache-build
 
 clean:
-	rm -f revmap
+	rm -f revmap cache-build
 	rm -rf cache/
 
 test:

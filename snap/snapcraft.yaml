@@ -23,15 +23,7 @@ parts:
       - go/latest/stable
     override-pull: |
       craftctl default
-      tag="$(git describe --tags --abbrev=0 2>/dev/null || echo 0.0.0)"
-      if git describe --tags --exact-match HEAD >/dev/null 2>&1; then
-        # Exactly on a tag
-        version="${tag}"
-      else
-        # Not on a tag: tag + short commit hash
-        commit="$(git rev-parse --short HEAD)"
-        version="${tag}+${commit}"
-      fi
+      version="$(./version.sh)"
       if [ -n "${REVMAP_BUILD_DATE:-}" ]; then
         version="${version}+${REVMAP_BUILD_DATE}"
       fi

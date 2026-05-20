@@ -13,6 +13,9 @@ const (
 	// MacaroonACLAPI is the endpoint to request an ACL macaroon from the store.
 	MacaroonACLAPI = StoreDashboardURL + "dev/api/acl/"
 
+	// AccountAPI is the endpoint to retrieve account information.
+	AccountAPI = StoreDashboardURL + "dev/api/account"
+
 	// DischargeAPI is the SSO endpoint to discharge a macaroon.
 	DischargeAPI = UbuntuOneAPIBase + "/tokens/discharge"
 

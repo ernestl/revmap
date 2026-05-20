@@ -12,16 +12,40 @@ import (
 	"golang.org/x/term"
 )
 
+var loginExportFile string
+
 var loginCmd = &cobra.Command{
 	Use:   "login",
 	Short: "Authenticate with the Snap Store",
 	Long: `Authenticate with the Snap Store using your Ubuntu One SSO
 credentials. Credentials are stored locally for subsequent use.
 
+Use --export to write credentials to a file in the snapcraft INI
+format, compatible with SNAPCRAFT_STORE_CREDENTIALS:
+
+    revmap login --export credentials.txt
+    export SNAPCRAFT_STORE_CREDENTIALS=$(cat credentials.txt)
+
+If already logged in, --export writes the existing credentials
+without re-authenticating.
+
+When running as a snap, relative paths are resolved under the snap's
+user data directory (~/snap/revmap/common/) since strict confinement
+prevents writing to arbitrary locations. Absolute paths are used as-is.
+
 You can also set the SNAPCRAFT_STORE_CREDENTIALS environment variable
 with snapcraft export-login output to skip interactive login.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// If --export is used with existing credentials, just export.
+		if loginExportFile != "" && store.CredentialsExist() {
+			if err := store.ExportCredentials(loginExportFile); err != nil {
+				return err
+			}
+			fmt.Printf("Credentials exported to %s.\n", store.ExportPath(loginExportFile))
+			return nil
+		}
+
 		if store.CredentialsExist() {
 			fmt.Println("You are already logged in. Run 'revmap logout' first to re-authenticate.")
 			return nil
@@ -64,10 +88,19 @@ with snapcraft export-login output to skip interactive login.`,
 		}
 
 		fmt.Println("Login successful.")
+
+		// Export if requested.
+		if loginExportFile != "" {
+			if err := store.ExportCredentials(loginExportFile); err != nil {
+				return err
+			}
+			fmt.Printf("Credentials exported to %s.\n", store.ExportPath(loginExportFile))
+		}
+
 		return nil
 	},
 }
 
 func init() {
-	rootCmd.AddCommand(loginCmd)
+	loginCmd.Flags().StringVar(&loginExportFile, "export", "", "export credentials to file in snapcraft format")
 }

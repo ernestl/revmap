@@ -7,6 +7,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 // Credentials holds the root and discharge macaroons for store authentication.
@@ -101,6 +102,67 @@ func CredentialsExist() bool {
 	return err == nil
 }
 
+// CredentialsSource returns a human-readable description of where the
+// current credentials are loaded from.
+func CredentialsSource() string {
+	if os.Getenv(CredentialsEnvVar) != "" {
+		return CredentialsEnvVar
+	}
+	return credentialsFilePath()
+}
+
+// CredentialsExpiry returns the expiry time of the stored credentials
+// by inspecting the root macaroon's first-party caveats. It checks for:
+//   - "time-before <timestamp>" (standard macaroon format)
+//   - "<location>|expires|<timestamp>" (Snap Store format)
+//
+// Returns zero time if no expiry is found.
+func CredentialsExpiry() (time.Time, error) {
+	creds, err := LoadCredentials()
+	if err != nil {
+		return time.Time{}, err
+	}
+
+	m, err := MacaroonDeserialize(creds.Root)
+	if err != nil {
+		return time.Time{}, fmt.Errorf("cannot deserialize root macaroon: %w", err)
+	}
+
+	for _, caveat := range m.Caveats() {
+		if caveat.Location != "" {
+			continue // skip third-party caveats
+		}
+
+		var ts string
+		switch {
+		case strings.HasPrefix(caveat.Id, "time-before "):
+			ts = strings.TrimPrefix(caveat.Id, "time-before ")
+		case strings.Contains(caveat.Id, "|expires|"):
+			parts := strings.SplitN(caveat.Id, "|expires|", 2)
+			if len(parts) == 2 {
+				ts = parts[1]
+			}
+		default:
+			continue
+		}
+
+		// Try multiple timestamp formats the store may use.
+		for _, layout := range []string{
+			"2006-01-02T15:04:05.000000",
+			"2006-01-02T15:04:05.999999",
+			"2006-01-02T15:04:05",
+			time.RFC3339,
+		} {
+			if t, err := time.Parse(layout, ts); err == nil {
+				return t, nil
+			}
+		}
+		return time.Time{}, fmt.Errorf("cannot parse expiry time: %s", ts)
+	}
+
+	return time.Time{}, nil
+}
+
 // decodeEnvCredentials decodes credentials from the environment variable.
 // It supports two formats:
 //
@@ -130,7 +192,50 @@ func decodeEnvCredentials(value string) (*Credentials, error) {
 	return &creds, nil
 }
 
-// parseSnapcraftCredentials parses the INI-style credential format
+// ExportCredentials writes the stored credentials to the given file in
+// the snapcraft INI format compatible with SNAPCRAFT_STORE_CREDENTIALS.
+// When running inside a snap, relative paths are resolved under
+// $SNAP_USER_COMMON since the snap cannot write to arbitrary directories.
+func ExportCredentials(path string) error {
+	creds, err := LoadCredentials()
+	if err != nil {
+		return err
+	}
+
+	path = resolveExportPath(path)
+
+	dir := filepath.Dir(path)
+	if err := os.MkdirAll(dir, 0700); err != nil {
+		return fmt.Errorf("cannot create export directory: %w", err)
+	}
+
+	content := fmt.Sprintf("[login.ubuntu.com]\nmacaroon = %s\nunbound_discharge = %s\n",
+		creds.Root, creds.Discharge)
+
+	if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		return fmt.Errorf("cannot write export file: %w", err)
+	}
+	return nil
+}
+
+// ExportPath returns the resolved path that ExportCredentials would
+// write to, so the caller can display it to the user.
+func ExportPath(path string) string {
+	return resolveExportPath(path)
+}
+
+// resolveExportPath resolves relative paths under $SNAP_USER_COMMON
+// when running inside a snap (strict confinement cannot write to
+// arbitrary directories).
+func resolveExportPath(path string) string {
+	if filepath.IsAbs(path) {
+		return path
+	}
+	if common := os.Getenv("SNAP_USER_COMMON"); common != "" {
+		return filepath.Join(common, path)
+	}
+	return path
+}
 // produced by "snapcraft export-login". The expected format is:
 //
 //	[login.ubuntu.com]

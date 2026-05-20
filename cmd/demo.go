@@ -76,7 +76,4 @@ func findDemoScript() string {
 	return ""
 }
 
-func init() {
-	demoCmd.Flags().BoolVar(&noPause, "no-pause", false, "run without pausing between commands")
-	rootCmd.AddCommand(demoCmd)
-}
+

@@ -22,6 +22,4 @@ var readmeCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	rootCmd.AddCommand(readmeCmd)
-}
+

@@ -15,9 +15,23 @@ import (
 	"github.com/ernestl/revmap/store"
 )
 
+// version is set at build time via:
+//
+//	go build -ldflags "-X main.version=1.0.0"
+var version string
+
 func main() {
+	showVersion := flag.Bool("version", false, "print version and exit")
 	workers := flag.Int("workers", 10, "number of concurrent revision detail fetches")
 	flag.Parse()
+
+	if *showVersion {
+		if version == "" {
+			version = "dev"
+		}
+		fmt.Println("cache-build", version)
+		return
+	}
 
 	if err := run(*workers); err != nil {
 		fmt.Fprintf(os.Stderr, "error: %v\n", err)
@@ -42,7 +56,8 @@ func run(workers int) error {
 			fmt.Fprintln(os.Stderr, "     export REVMAP_EMAIL=user@example.com")
 			fmt.Fprintln(os.Stderr, "     export REVMAP_PASSWORD=secret")
 			fmt.Fprintln(os.Stderr, "")
-			fmt.Fprintln(os.Stderr, "  3. Run 'revmap login' first to store credentials locally.")
+			fmt.Fprintln(os.Stderr, "  3. Run 'revmap login' to store credentials locally.")
+			fmt.Fprintln(os.Stderr, "     Use 'revmap login --help' for details.")
 			fmt.Fprintln(os.Stderr, "")
 			fmt.Fprintln(os.Stderr, "For GitHub Actions, add the secret SNAPCRAFT_STORE_CREDENTIALS")
 			fmt.Fprintln(os.Stderr, "to your repository (Settings > Secrets and variables > Actions).")
@@ -158,6 +173,9 @@ func buildCacheForSnap(client *store.Client, snapName string, workers int) error
 	}
 
 	outPath := fmt.Sprintf("cache/%s.json.gz", snapName)
+	if info, err := os.Stat(outPath); err == nil {
+		fmt.Printf("  Warning: overwriting existing %s (modified %s)\n", outPath, info.ModTime().Format("2006-01-02 15:04:05"))
+	}
 	fmt.Printf("  Writing %s...\n", outPath)
 	if err := store.WriteCache(outPath, cacheData); err != nil {
 		return err

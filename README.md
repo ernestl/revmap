@@ -49,6 +49,26 @@ When installed as a snap:
 This respects XDG_DATA_HOME. Expired discharge macaroons are
 refreshed automatically.
 
+To export credentials for use in CI or with
+SNAPCRAFT_STORE_CREDENTIALS:
+
+    revmap login --export credentials.txt
+    export SNAPCRAFT_STORE_CREDENTIALS=$(cat credentials.txt)
+
+If already logged in, --export writes the existing credentials
+without re-authenticating.
+
+When installed as a snap, relative paths are resolved under
+~/snap/revmap/common/ (the snap's writable user directory)
+since strict confinement prevents writing elsewhere. Absolute
+paths are used as-is. Example from within the snap:
+
+    revmap login --export credentials.txt
+    # writes to ~/snap/revmap/common/credentials.txt
+
+When running from source or `go install`, relative paths are
+resolved from the current working directory as usual.
+
 Alternatively, set the SNAPCRAFT_STORE_CREDENTIALS environment
 variable to skip interactive login. This accepts two formats:
 
@@ -131,6 +151,14 @@ Show full details of a specific revision:
 Optionally filter to specific fields:
 
     revmap show snapd 17339 -f version,status,architectures
+
+### whoami
+
+Show the currently authenticated account:
+
+    revmap whoami
+
+Displays email, username, and registered snap names.
 
 ### demo
 
@@ -251,11 +279,21 @@ Each `.json.gz` file contains gzip-compressed JSON with:
 
 ## Building
 
-    make              # build the binary
+    make              # build both binaries (revmap + cache-build)
     make test         # run tests with race detector
     make cache        # build offline cache (requires login)
-    make clean        # remove binary and cache
+    make clean        # remove binaries and cache
     make check        # run checks.sh
+
+`make build` produces two binaries:
+
+- `revmap` -- the main CLI tool
+- `cache-build` -- standalone cache generation tool
+
+Both binaries share the same version, set automatically from the
+latest git tag. Check with:
+
+    ./cache-build -version
 
 The `cache` target depends on `build` and runs
 `revmap cache-build`. You must be logged in first:

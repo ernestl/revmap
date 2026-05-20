@@ -20,13 +20,39 @@ history of snaps published in the Snap Store.`,
 }
 
 func init() {
-	rootCmd.SetHelpCommand(&cobra.Command{Hidden: true})
+	cobra.EnableCommandSorting = false
+
+	rootCmd.SetHelpCommand(&cobra.Command{Hidden: true, GroupID: "learn"})
+
+	rootCmd.AddGroup(
+		&cobra.Group{ID: "auth", Title: "Auth:"},
+		&cobra.Group{ID: "query", Title: "Query:"},
+		&cobra.Group{ID: "learn", Title: "Learn:"},
+	)
+
+	loginCmd.GroupID = "auth"
+	whoamiCmd.GroupID = "auth"
+	logoutCmd.GroupID = "auth"
+
+	listCmd.GroupID = "query"
+	showCmd.GroupID = "query"
+
+	readmeCmd.GroupID = "learn"
+	demoCmd.GroupID = "learn"
+
+	rootCmd.AddCommand(loginCmd)
+	rootCmd.AddCommand(whoamiCmd)
+	rootCmd.AddCommand(logoutCmd)
+	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(showCmd)
+	rootCmd.AddCommand(readmeCmd)
+	rootCmd.AddCommand(demoCmd)
 }
 
 // Execute runs the root command.
 func Execute() {
 	if err := rootCmd.Execute(); err != nil {
-		fmt.Fprintln(os.Stderr, err)
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
 }

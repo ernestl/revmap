@@ -27,6 +27,4 @@ var logoutCmd = &cobra.Command{
 	},
 }
 
-func init() {
-	rootCmd.AddCommand(logoutCmd)
-}
+

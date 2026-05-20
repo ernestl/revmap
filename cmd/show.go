@@ -97,13 +97,7 @@ func parseFieldList(fieldList string) []string {
 	return result
 }
 
-func init() {
-	showCmd.Flags().SortFlags = false
 
-	showCmd.Flags().StringVarP(&fields, "fields", "f", "", "comma-separated list of fields to display")
-
-	rootCmd.AddCommand(showCmd)
-}
 
 // showFromCache attempts to serve the show request from the
 // pre-built cache. If no cache is available, it returns an error
