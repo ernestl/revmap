@@ -5,9 +5,10 @@ of snaps published in the Snap Store (https://snapcraft.io).
 
 ## Requirements
 
-- Go 1.22+
+- Go 1.25+
 - An Ubuntu One account (https://login.ubuntu.com/) with
-  access to the Snap Store dashboard
+  access to the Snap Store dashboard (optional if using
+  cached data)
 
 ## Installation
 
@@ -130,6 +131,127 @@ Show full details of a specific revision:
 Optionally filter to specific fields:
 
     revmap show snapd 17339 -f version,status,architectures
+
+### demo
+
+Run an interactive demo showcasing revmap's features:
+
+    revmap demo
+    revmap demo --no-pause
+
+The demo uses the snapd snap as an example and walks through
+list/show commands with various filters, including cache
+fallback.
+
+### cache-build
+
+Build the offline cache for all snaps in `cache-snaps.json`:
+
+    revmap cache-build
+    revmap cache-build --workers 20
+
+Requires authentication. See the Offline Cache section below
+for the full workflow.
+
+## Offline Cache
+
+revmap can bundle a pre-built cache of revision history so
+that users without store permissions can still browse data.
+
+### How it works
+
+When a user runs `revmap list` or `revmap show` and either:
+- is not logged in, or
+- receives a permission error (401/403/404) from the store
+
+revmap automatically falls back to cached data if available,
+displaying a notice:
+
+    Using cached data from 2026-05-20 (run 'revmap login' for live results)
+
+or:
+
+    Using cached data from 2026-05-20 (insufficient permissions for live data)
+
+### Building the cache
+
+The cache is built before creating the snap. It requires
+authentication with an account that has access to the target
+snaps.
+
+1. Configure which snaps to cache in `cache-snaps.json`:
+
+       ["snapd"]
+
+2. Build the cache:
+
+       revmap login
+       revmap cache-build
+
+   This fetches the complete revision list and all individual
+   revision details for each configured snap, writing
+   compressed files to `cache/<snap>.json.gz`.
+
+   Options:
+
+       --workers N    concurrent detail fetches (default 10)
+
+3. Build the snap (cache is bundled automatically):
+
+       snapcraft
+
+### Automated builds (CI / Launchpad)
+
+For automated builds where interactive login is not possible,
+set environment variables instead:
+
+    export REVMAP_EMAIL="user@example.com"
+    export REVMAP_PASSWORD="secret"
+    revmap cache-build
+
+The account **must not** have two-factor authentication (2FA)
+enabled. A 2FA-enabled account will fail with "two-factor
+authentication required". Use a dedicated service account with
+only `package_access` permission and no 2FA.
+
+For Launchpad snap builds, store the credentials as build
+secrets (`store-email` and `store-password`). The
+`snapcraft.yaml` override-build step exports these as
+`REVMAP_EMAIL` and `REVMAP_PASSWORD` automatically.
+
+If the build secrets are not configured, the snap will still
+build — it will just ship without a cache.
+
+### Cache location
+
+At runtime, revmap searches for cache files in order:
+
+1. `$SNAP/cache/<snap>.json.gz` (inside the snap)
+2. Next to the executable: `<exe-dir>/cache/<snap>.json.gz`
+3. Current working directory: `cache/<snap>.json.gz`
+
+### Cache contents
+
+Each `.json.gz` file contains gzip-compressed JSON with:
+
+- `snap` -- snap name
+- `cached_at` -- timestamp of when the cache was built
+- `revisions` -- full revision list (same as store API)
+- `details` -- map of revision number to full revision detail
+
+## Building
+
+    make              # build the binary
+    make test         # run tests with race detector
+    make cache        # build offline cache (requires login)
+    make clean        # remove binary and cache
+    make check        # run checks.sh
+
+The `cache` target depends on `build` and runs
+`revmap cache-build`. You must be logged in first:
+
+    revmap login
+    make cache
 
 ## Testing
 

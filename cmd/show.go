@@ -18,6 +18,8 @@ var showCmd = &cobra.Command{
 	Long: `Show full details for a specific revision of a snap.
 
 Requires authentication. Run 'revmap login' first.
+If not authenticated or lacking permissions, cached data is
+used automatically when available.
 
 Examples:
   revmap show snapd 17339
@@ -27,8 +29,9 @@ Examples:
 		snapName := args[0]
 		revision := args[1]
 
+		// If not authenticated, try to use cached data.
 		if !store.CredentialsExist() {
-			return fmt.Errorf("not logged in (run 'revmap login' first)")
+			return showFromCache(snapName, revision, "run 'revmap login' for live results")
 		}
 
 		client := store.NewClient()
@@ -40,6 +43,9 @@ Examples:
 func showRevision(client *store.Client, snapName, revision string) error {
 	info, err := client.GetRevision(snapName, revision)
 	if err != nil {
+		if isCacheFallbackErr(err) {
+			return showFromCache(snapName, revision, "insufficient permissions for live data")
+		}
 		return err
 	}
 
@@ -97,4 +103,36 @@ func init() {
 	showCmd.Flags().StringVarP(&fields, "fields", "f", "", "comma-separated list of fields to display")
 
 	rootCmd.AddCommand(showCmd)
+}
+
+// showFromCache attempts to serve the show request from the
+// pre-built cache. If no cache is available, it returns an error
+// with the given reason context.
+func showFromCache(snapName, revision, reason string) error {
+	cachePath := store.FindCacheFile(snapName)
+	if cachePath == "" {
+		return fmt.Errorf("no cache available for %q (%s)", snapName, reason)
+	}
+
+	cacheData, err := store.ReadCache(cachePath)
+	if err != nil {
+		return fmt.Errorf("cannot read cache: %w", err)
+	}
+
+	raw, ok := cacheData.Details[revision]
+	if !ok {
+		return fmt.Errorf("revision %s not found in cache for %q", revision, snapName)
+	}
+
+	fmt.Fprintf(os.Stderr, "Using cached data from %s (%s)\n\n",
+		cacheData.CachedAt.Format("2006-01-02"), reason)
+
+	result := filterFields(raw, fields)
+
+	output, err := json.MarshalIndent(result, "", "  ")
+	if err != nil {
+		return fmt.Errorf("cannot format output: %w", err)
+	}
+	fmt.Fprintln(os.Stdout, string(output))
+	return nil
 }

@@ -4,13 +4,16 @@ This document describes the architecture and key design decisions behind revmap.
 
 ## Overview
 
-revmap is a read-only CLI tool that queries the Snap Store's dashboard API to display revision and version history for published snaps. It authenticates using the same macaroon-based scheme as snapcraft.
+revmap is a read-only CLI tool that queries the Snap Store's dashboard API to display revision and version history for published snaps. It authenticates using the same macaroon-based scheme as snapcraft. When authentication is unavailable or insufficient, it falls back to pre-built compressed cache files bundled in the snap.
 
 ## Project Structure
 
 ```
 revmap/
   main.go                 Entry point; embeds README, sets version via ldflags
+  cache-snaps.json        Configuration: list of snaps to pre-cache
+  cache/                  Generated cache files (gitignored)
+  demo.sh                 Interactive demo script (invoked by demo command)
   cmd/
     root.go               Root Cobra command
     version.go            Version resolution (ldflags or VCS fallback)
@@ -18,6 +21,8 @@ revmap/
     logout.go             Credential removal
     list.go               Revision listing with filters and table output
     show.go               Single revision detail view
+    cache.go              Cache-build subcommand (pre-build cache generation)
+    demo.go               Demo subcommand (runs demo.sh)
     readme.go             Embedded README display
     list_test.go           Tests for list logic
     show_test.go           Tests for show logic
@@ -28,6 +33,7 @@ revmap/
     credentials.go        File-based credential storage with env var override
     client.go             Authenticated HTTP client with auto-refresh
     revisions.go          Store API calls (revisions, releases with pagination)
+    cache.go              Cache data structures, gzip read/write, file lookup
     auth_test.go          Tests for macaroon serialization and caveat extraction
     credentials_test.go   Tests for credential storage
     client_test.go        Tests for refresh detection
@@ -145,6 +151,53 @@ Default columns: `revision,version,arch,status,created`. Additional: `confinemen
 
 Fetches a single revision by number and outputs the JSON response. The `--fields` / `-f` flag filters to specific fields from the nested `revision` object.
 
+### cache-build
+
+Fetches the complete revision history and individual revision details for all snaps listed in `cache-snaps.json`, writing compressed cache files to `cache/`.
+
+**Authentication:** If credentials already exist (user ran `revmap login` or `REVMAP_STORE_CREDENTIALS` is set), they are used directly. Otherwise, `cache-build` checks for `REVMAP_EMAIL` and `REVMAP_PASSWORD` environment variables and performs a non-interactive login via `store.Login(email, password, "")`. The OTP parameter is always empty — the account must not have two-factor authentication enabled. A 2FA-enabled account will return `ErrTwoFactorRequired`, surfaced as `"automatic login failed: two-factor authentication required"`.
+
+**Workflow:**
+1. Authenticates (existing credentials or env-var login)
+2. Reads `cache-snaps.json` (searched in cwd, `$SNAP/`, or next to executable)
+3. For each snap: fetches all releases (paginating to completion with `FetchAll: true`)
+4. Concurrently fetches each revision's detail via the revisions endpoint (`--workers` controls parallelism, default 10)
+5. Skips revisions that return 404 (some entries in the releases list may have been deleted)
+6. Writes `cache/<snap>.json.gz` — gzip-compressed JSON containing the full `CacheData` struct
+
+**Cache data structure** (`store.CacheData`):
+```go
+type CacheData struct {
+    Snap      string                            // snap name
+    CachedAt  time.Time                         // build timestamp
+    Revisions []RevisionEntry                   // full revision list
+    Details   map[string]map[string]interface{} // revision number → detail JSON
+}
+```
+
+### demo
+
+Locates and executes `demo.sh` with the current binary path set as `REVMAP`. Searches for the script in `$SNAP/bin/`, next to the executable, or the current working directory. Supports `--no-pause` for non-interactive execution.
+
+## Cache Fallback
+
+Both `list` and `show` commands implement a two-tier fallback to cached data:
+
+1. **No credentials** -- If `CredentialsExist()` returns false, attempt to load from cache immediately. Notice: `"Using cached data from <date> (run 'revmap login' for live results)"`.
+
+2. **Permission error** -- If the store returns 401, 403, or 404 after authentication, fall back to cache. Notice: `"Using cached data from <date> (insufficient permissions for live data)"`. This handles users who are logged in but lack access to a particular snap.
+
+3. **No cache available** -- If neither credentials nor cache exist, return an error: `"no cache available for <snap> (<reason>)"`.
+
+**Cache file resolution** (`store.FindCacheFile`): Searches in order:
+- `$SNAP/cache/<snap>.json.gz` (inside snap at runtime)
+- `<executable-dir>/cache/<snap>.json.gz`
+- `./cache/<snap>.json.gz` (development)
+
+**Local filtering on cached data** (`applyCacheTimeWindow`): When serving from cache, the same time window and limit flags (`--since`, `--until`, `--limit`, `--all`) are applied locally against the cached revision list. The default 90-day window is applied when no scope flags are given. Row filters (`--arch`, `--build`, `--version`, `--status`) work identically on cached data.
+
+**Error classification** (`isCacheFallbackErr`): Matches error strings containing "status 401", "status 403", or "status 404" — the patterns produced by `store/revisions.go` and `store/client.go`.
+
 ## Testing Strategy
 
 Tests focus on pure logic functions that don't require network access or interactive I/O:
@@ -165,3 +218,21 @@ Not tested (require integration/real API): `store/revisions.go` (HTTP client met
 | `github.com/spf13/cobra` | CLI framework |
 | `golang.org/x/term` | Secure password input (no echo) |
 | `gopkg.in/macaroon.v1` | Macaroon creation, serialization, binding (matches snapd) |
+
+## Snap Packaging
+
+The snap is built with `snapcraft` using `base: bare` (no runtime base snap) and `confinement: strict`. The `override-build` step:
+
+1. Compiles the Go binary with version from `git describe`
+2. Installs `demo.sh` to `$SNAP/bin/`
+3. Copies `cache/*.json.gz` to `$SNAP/cache/` (if present)
+
+The snap only requires the `network` plug for store API access. When running from cache, no network access is needed (though the plug is still declared).
+
+Pre-build workflow:
+
+```
+revmap login
+make cache          # builds binary + runs cache-build
+snapcraft           # produces the .snap file
+```

@@ -31,6 +31,17 @@ parts:
         -o ${CRAFT_PART_INSTALL}/bin/revmap .
       install -m 755 demo.sh ${CRAFT_PART_INSTALL}/bin/demo.sh
 
+      # Build cache: uses existing login or env vars from build secrets.
+      # The account must not have 2FA enabled.
+      export REVMAP_EMAIL="$(craftctl get store-email 2>/dev/null || true)"
+      export REVMAP_PASSWORD="$(craftctl get store-password 2>/dev/null || true)"
+      ./revmap cache-build || echo "WARNING: cache-build failed, snap will ship without cache"
+
+      if [ -d cache ]; then
+        mkdir -p ${CRAFT_PART_INSTALL}/cache
+        cp cache/*.json.gz ${CRAFT_PART_INSTALL}/cache/
+      fi
+
 apps:
   revmap:
     command: bin/revmap

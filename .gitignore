@@ -1,5 +1,3 @@
 revmap
 *.snap
-result.txt
-snapd_revision_version_map.txt
-snapd_revision_version_map.html
+cache/

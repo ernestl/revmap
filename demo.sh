@@ -97,5 +97,42 @@ run "Inspect a specific revision (JSON)" \
 run "Select specific fields from a revision" \
     $REVMAP show snapd 17339 -f version,status,architectures
 
+# 11. Cache fallback — demonstrate offline/unauthenticated usage
+# Temporarily hide credentials to show cache behavior.
+echo
+echo "  # Cache fallback demo: simulating unauthenticated access"
+echo "  # (temporarily hiding credentials)"
+echo
+
+CREDS_PATH="${XDG_DATA_HOME:-$HOME/.local/share}/revmap/credentials.json"
+if [[ -n "$SNAP_USER_COMMON" ]]; then
+    CREDS_PATH="$SNAP_USER_COMMON/credentials.json"
+fi
+
+CREDS_HIDDEN=false
+if [[ -f "$CREDS_PATH" ]]; then
+    mv "$CREDS_PATH" "${CREDS_PATH}.demo-bak"
+    CREDS_HIDDEN=true
+fi
+
+# Ensure credentials are restored even if something fails.
+restore_creds() {
+    if [[ "$CREDS_HIDDEN" == "true" && -f "${CREDS_PATH}.demo-bak" ]]; then
+        mv "${CREDS_PATH}.demo-bak" "$CREDS_PATH"
+    fi
+}
+trap restore_creds EXIT
+
+run "List from cache (no credentials)" \
+    $REVMAP list snapd -n 5
+
+run "Show from cache (no credentials)" \
+    $REVMAP show snapd 27239 -f version,architectures
+
+# Restore credentials (trap will also handle unexpected exits).
+restore_creds
+CREDS_HIDDEN=false
+trap - EXIT
+
 echo
 echo "Demo complete."

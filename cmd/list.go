@@ -103,6 +103,9 @@ var listCmd = &cobra.Command{
 	Long: `List the revision history of a snap published in the Snap Store.
 
 Requires authentication. Run 'revmap login' first.
+If not authenticated or lacking permissions, cached data is
+used automatically when available.
+
 By default only the last 90 days are shown. Use --all to fetch
 complete history, or --limit/-n to fetch up to a specific number
 of revisions across all pages.
@@ -115,10 +118,6 @@ Examples:
 	Args: cobra.ExactArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		snapName := args[0]
-
-		if !store.CredentialsExist() {
-			return fmt.Errorf("not logged in (run 'revmap login' first)")
-		}
 
 		// Compile version regex if provided.
 		if filterVer != "" {
@@ -136,6 +135,11 @@ Examples:
 				return fmt.Errorf("invalid --build regex %q: %v", filterBuild, err)
 			}
 			filterBuildRe = re
+		}
+
+		// If not authenticated, try to use cached data.
+		if !store.CredentialsExist() {
+			return listFromCache(snapName, "run 'revmap login' for live results")
 		}
 
 		client := store.NewClient()
@@ -159,6 +163,9 @@ func listRevisions(client *store.Client, snapName string) error {
 
 	releases, err := client.GetReleases(snapName, opts)
 	if err != nil {
+		if isCacheFallbackErr(err) {
+			return listFromCache(snapName, "insufficient permissions for live data")
+		}
 		return err
 	}
 
@@ -186,8 +193,102 @@ func listRevisions(client *store.Client, snapName string) error {
 	return nil
 }
 
-// resolveColumns parses the --columns flag and returns the ordered
-// list of column definitions.
+// listFromCache attempts to serve the list request from the
+// pre-built cache. If no cache is available, it returns an error
+// with the given reason context.
+func listFromCache(snapName, reason string) error {
+	cachePath := store.FindCacheFile(snapName)
+	if cachePath == "" {
+		return fmt.Errorf("no cache available for %q (%s)", snapName, reason)
+	}
+
+	cacheData, err := store.ReadCache(cachePath)
+	if err != nil {
+		return fmt.Errorf("cannot read cache: %w", err)
+	}
+
+	fmt.Printf("Using cached data from %s (%s)\n\n",
+		cacheData.CachedAt.Format("2006-01-02"), reason)
+
+	// Resolve columns.
+	cols, err := resolveColumns(columns)
+	if err != nil {
+		return err
+	}
+
+	// Apply time window and limit filtering on cached revisions.
+	revisions := applyCacheTimeWindow(cacheData.Revisions)
+
+	// Sort by revision number descending (newest first).
+	sort.Slice(revisions, func(i, j int) bool {
+		return revisions[i].Revision > revisions[j].Revision
+	})
+
+	// Apply row filters.
+	filtered := applyFilters(revisions)
+
+	if len(filtered) == 0 {
+		fmt.Println("No revisions match the given filters.")
+		return nil
+	}
+
+	printTable(cols, filtered)
+
+	fmt.Printf("\nTotal: %d revisions\n", len(filtered))
+	return nil
+}
+
+// applyCacheTimeWindow filters cached revisions by the time window
+// and limit flags (same logic as FetchOptions but applied locally).
+func applyCacheTimeWindow(revisions []store.RevisionEntry) []store.RevisionEntry {
+	opts, err := parseTimeWindow(since, until, limit, fetchAll)
+	if err != nil {
+		// parseTimeWindow already validated in RunE for live path;
+		// for cache path, just return all if parsing fails.
+		return revisions
+	}
+
+	var result []store.RevisionEntry
+	for _, rev := range revisions {
+		if !opts.Since.IsZero() || !opts.Until.IsZero() {
+			t, err := time.Parse(time.RFC3339, rev.CreatedAt)
+			if err != nil {
+				continue
+			}
+			if !opts.Until.IsZero() && t.After(opts.Until) {
+				continue
+			}
+			if !opts.Since.IsZero() && t.Before(opts.Since) {
+				continue
+			}
+		}
+
+		result = append(result, rev)
+
+		if opts.MaxRevisions > 0 && len(result) >= opts.MaxRevisions {
+			break
+		}
+	}
+
+	// If no time bounds and no explicit --all, apply default 90-day window.
+	if opts.Since.IsZero() && opts.Until.IsZero() && !opts.FetchAll && opts.MaxRevisions == 0 {
+		cutoff := time.Now().AddDate(0, 0, -90)
+		var windowed []store.RevisionEntry
+		for _, rev := range revisions {
+			t, err := time.Parse(time.RFC3339, rev.CreatedAt)
+			if err != nil {
+				continue
+			}
+			if t.Before(cutoff) {
+				continue
+			}
+			windowed = append(windowed, rev)
+		}
+		return windowed
+	}
+
+	return result
+}
 func resolveColumns(colStr string) ([]column, error) {
 	if colStr == "" {
 		colStr = defaultColumns
