@@ -29,9 +29,18 @@ jobs:
         env:
           REVMAP_BUILD_DATE: "1"
 
+      - name: Determine channels
+        id: channels
+        run: |
+          if git describe --exact-match HEAD >/dev/null 2>&1; then
+            echo "release=beta,candidate,stable" >> "$GITHUB_OUTPUT"
+          else
+            echo "release=edge" >> "$GITHUB_OUTPUT"
+          fi
+
       - uses: snapcore/action-publish@v1
         with:
           snap: ${{ steps.build.outputs.snap }}
-          release: edge,beta,candidate,stable
+          release: ${{ steps.channels.outputs.release }}
         env:
           SNAPCRAFT_STORE_CREDENTIALS: ${{ secrets.SNAPCRAFT_STORE_CREDENTIALS }}

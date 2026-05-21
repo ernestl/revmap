@@ -116,6 +116,8 @@ func buildCacheForSnap(client *store.Client, snapName string, workers int) error
 	sem := make(chan struct{}, workers)
 	var wg sync.WaitGroup
 
+	var processed int
+
 	for i, rev := range releases.Revisions {
 		if fetchErr != nil {
 			break
@@ -130,19 +132,20 @@ func buildCacheForSnap(client *store.Client, snapName string, workers int) error
 
 			revStr := strconv.Itoa(revision)
 			info, err := client.GetRevision(snapName, revStr)
+
+			mu.Lock()
+			processed++
 			if err != nil {
 				// Skip 404s — some revisions in the releases list
 				// may have been deleted from the revision endpoint.
 				var storeErr *store.StoreError
 				if errors.As(err, &storeErr) && storeErr.StatusCode == 404 {
-					mu.Lock()
-					if (idx+1)%100 == 0 {
-						fmt.Printf("    %d/%d details fetched\n", idx+1, len(releases.Revisions))
+					if processed%100 == 0 {
+						fmt.Printf("    %d/%d processed\n", processed, len(releases.Revisions))
 					}
 					mu.Unlock()
 					return
 				}
-				mu.Lock()
 				if fetchErr == nil {
 					fetchErr = fmt.Errorf("revision %d: %w", revision, err)
 				}
@@ -150,10 +153,9 @@ func buildCacheForSnap(client *store.Client, snapName string, workers int) error
 				return
 			}
 
-			mu.Lock()
 			details[revStr] = info.Raw
-			if (idx+1)%100 == 0 {
-				fmt.Printf("    %d/%d details fetched\n", idx+1, len(releases.Revisions))
+			if processed%100 == 0 {
+				fmt.Printf("    %d/%d processed\n", processed, len(releases.Revisions))
 			}
 			mu.Unlock()
 		}(rev.Revision, i)
@@ -161,8 +163,13 @@ func buildCacheForSnap(client *store.Client, snapName string, workers int) error
 
 	wg.Wait()
 
-	// Always show the final count.
-	fmt.Printf("    %d/%d details fetched\n", len(details), len(releases.Revisions))
+	// Always show the final result.
+	skipped := len(releases.Revisions) - len(details)
+	if skipped > 0 {
+		fmt.Printf("    %d/%d details fetched (%d skipped)\n", len(details), len(releases.Revisions), skipped)
+	} else {
+		fmt.Printf("    %d/%d details fetched\n", len(details), len(releases.Revisions))
+	}
 
 	if fetchErr != nil {
 		return fetchErr
