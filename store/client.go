@@ -92,6 +92,8 @@ func (c *Client) Do(req *http.Request) (*http.Response, error) {
 
 // needsRefresh checks whether a 401 response contains the
 // "macaroon-needs-refresh" error code from the store.
+// It reads and restores the response body so the caller can
+// still consume it if this returns false.
 func needsRefresh(resp *http.Response) bool {
 	var body struct {
 		ErrorList []struct {
@@ -103,8 +105,9 @@ func needsRefresh(resp *http.Response) bool {
 		} `json:"error-list"`
 	}
 
-	// Read and parse the body to check for the refresh error code.
+	// Read the body, then restore it for the caller.
 	raw, err := io.ReadAll(resp.Body)
+	resp.Body = io.NopCloser(bytes.NewReader(raw))
 	if err != nil {
 		return false
 	}

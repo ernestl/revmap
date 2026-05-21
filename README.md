@@ -172,12 +172,24 @@ The demo uses the snapd snap as an example and walks through
 list/show commands with various filters, including cache
 fallback.
 
+### readme / design
+
+Display documentation directly in the terminal, rendered with
+styled markdown (headers, code blocks, syntax highlighting):
+
+    revmap readme
+    revmap design
+
+The `design` command is particularly useful as context for
+coding agents before making contributions.
+
 ### cache-build
 
-Build the offline cache for all snaps in `cache-snaps.json`:
+`cache-build` is a standalone binary (not a revmap subcommand) that
+builds the offline cache for all snaps in `cache-snaps.json`:
 
-    revmap cache-build
-    revmap cache-build --workers 50
+    ./cache-build
+    ./cache-build -workers 50
 
 Requires authentication. See the Offline Cache section below
 for the full workflow.
@@ -223,7 +235,7 @@ snaps.
 
    Options:
 
-       revmap cache-build --workers 50
+       ./cache-build -workers 50
 
 3. Build the snap (cache is bundled automatically):
 
@@ -240,7 +252,7 @@ set environment variables instead:
 
     export REVMAP_EMAIL="user@example.com"
     export REVMAP_PASSWORD="secret"
-    revmap cache-build
+    ./cache-build
 
 The account **must not** have two-factor authentication (2FA)
 enabled. A 2FA-enabled account will fail with "two-factor
@@ -297,8 +309,8 @@ latest git tag. Check with:
 
     ./cache-build -version
 
-The `cache` target depends on `build` and runs
-`revmap cache-build`. You must be logged in first:
+The `cache` target runs `go run ./cmd/cache-build`.
+You must be logged in first:
 
     revmap login
     make cache

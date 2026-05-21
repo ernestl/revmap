@@ -25,6 +25,10 @@ Requires authentication. Run 'revmap login' first.
 If not authenticated or lacking permissions, cached data is
 used automatically when available.
 
+Without --fields, the full JSON response is displayed. Use -f to
+select specific fields from the revision object (e.g. version,
+status, architectures, created_at, base, confinement, size).
+
 Examples:
   revmap show snapd 17339
   revmap show snapd 17339 -f version,status,architectures`,

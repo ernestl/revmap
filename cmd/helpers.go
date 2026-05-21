@@ -1,15 +1,20 @@
 package cmd
 
-import "strings"
+import (
+	"errors"
+
+	"github.com/ernestl/revmap/store"
+)
 
 // isCacheFallbackErr returns true if the error indicates a permission
 // or access issue (401, 403, 404) where falling back to cache is appropriate.
 func isCacheFallbackErr(err error) bool {
-	if err == nil {
-		return false
+	var storeErr *store.StoreError
+	if errors.As(err, &storeErr) {
+		switch storeErr.StatusCode {
+		case 401, 403, 404:
+			return true
+		}
 	}
-	msg := err.Error()
-	return strings.Contains(msg, "status 401") ||
-		strings.Contains(msg, "status 403") ||
-		strings.Contains(msg, "status 404")
+	return false
 }

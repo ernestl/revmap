@@ -103,9 +103,14 @@ func init() {
 	listCmd.Flags().StringVarP(&columns, "columns", "c", defaultColumns, "columns to display (comma-separated)")
 }
 
-// columnNames returns the sorted list of available column names.
+// columnNames returns the available column names in display order.
 func columnNames() string {
-	return "revision, version, arch, status, created, confinement, base, size"
+	names := make([]string, 0, len(allColumns))
+	for name := range allColumns {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return strings.Join(names, ", ")
 }
 
 var listCmd = &cobra.Command{
@@ -120,6 +125,9 @@ used automatically when available.
 By default only the last 90 days are shown. Use --all to fetch
 complete history, or --limit/-n to fetch up to a specific number
 of revisions across all pages.
+
+Available columns: arch, base, confinement, created, revision, size, status, version.
+Build types: release, fips (comma-separated).
 
 Examples:
   revmap list snapd
@@ -242,6 +250,8 @@ func listFromCache(snapName, reason string) error {
 
 // applyCacheTimeWindow filters cached revisions by the time window
 // and limit flags (same logic as FetchOptions but applied locally).
+// Revisions are sorted newest-first before applying limits so that
+// --limit returns the N most recent revisions.
 func applyCacheTimeWindow(revisions []store.RevisionEntry) []store.RevisionEntry {
 	opts, err := parseTimeWindow(since, until, limit, fetchAll)
 	if err != nil {
@@ -249,6 +259,11 @@ func applyCacheTimeWindow(revisions []store.RevisionEntry) []store.RevisionEntry
 		// for cache path, just return all if parsing fails.
 		return revisions
 	}
+
+	// Sort newest-first before applying limits.
+	sort.Slice(revisions, func(i, j int) bool {
+		return revisions[i].Revision > revisions[j].Revision
+	})
 
 	var result []store.RevisionEntry
 	for _, rev := range revisions {
