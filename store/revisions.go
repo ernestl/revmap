@@ -7,6 +7,16 @@ import (
 	"time"
 )
 
+// StoreError represents an HTTP error response from the store API.
+type StoreError struct {
+	StatusCode int
+	Message    string
+}
+
+func (e *StoreError) Error() string {
+	return e.Message
+}
+
 // RevisionsAPI returns the endpoint URL for fetching a specific snap revision.
 func RevisionsAPI(snapName string, revision string) string {
 	return fmt.Sprintf("%sapi/v2/snaps/%s/revisions/%s", StoreDashboardURL, snapName, revision)
@@ -90,7 +100,10 @@ func (c *Client) GetRevision(snapName string, revision string) (*RevisionInfo, e
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("store returned status %d for %s revision %s", resp.StatusCode, snapName, revision)
+		return nil, &StoreError{
+			StatusCode: resp.StatusCode,
+			Message:    fmt.Sprintf("store returned status %d for %s revision %s", resp.StatusCode, snapName, revision),
+		}
 	}
 
 	var raw map[string]interface{}
@@ -191,7 +204,10 @@ func (c *Client) fetchReleasesPage(url string) (*releasesPage, error) {
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("store returned status %d fetching releases", resp.StatusCode)
+		return nil, &StoreError{
+			StatusCode: resp.StatusCode,
+			Message:    fmt.Sprintf("store returned status %d fetching releases", resp.StatusCode),
+		}
 	}
 
 	var page releasesPage

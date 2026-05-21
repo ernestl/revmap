@@ -10,11 +10,12 @@ revmap is a read-only CLI tool that queries the Snap Store's dashboard API to di
 
 ```
 revmap/
-  main.go                 Entry point; embeds README, sets version via ldflags
+  main.go                 Entry point; embeds README and DESIGN, sets version via ldflags
   cache-snaps.json        Configuration: list of snaps to pre-cache
   cache/                  Generated cache files (gitignored)
   demo.sh                 Interactive demo script (invoked by demo command)
   test.sh                 Unified test runner (--unit, --static, --all)
+  version.sh              Single source of truth for version string
   cmd/
     root.go               Root Cobra command, group registration, command ordering
     version.go            Version resolution (ldflags or VCS fallback)
@@ -23,15 +24,13 @@ revmap/
     whoami.go             Account information display
     list.go               Revision listing with filters and table output
     show.go               Single revision detail view
-    cache.go              Cache-build subcommand (pre-build cache generation)
+    helpers.go            Shared utilities (cache fallback error detection)
     design.go             Embedded DESIGN display (rendered via glamour)
     readme.go             Embedded README display (rendered via glamour)
     demo.go               Demo subcommand (runs demo.sh)
-    design.go             Embedded DESIGN display (rendered via glamour)
-    readme.go             Embedded README display (rendered via glamour)
-    list_test.go           Tests for list logic
-    show_test.go           Tests for show logic
-    version_test.go        Tests for version logic
+    list_test.go          Tests for list logic
+    show_test.go          Tests for show logic
+    version_test.go       Tests for version logic
   cmd/cache-build/
     main.go               Standalone cache-build binary (separate main package)
   store/
@@ -39,12 +38,12 @@ revmap/
     auth.go               Macaroon serialization, SSO discharge, login flow
     credentials.go        File-based credential storage with env var override
     account.go            Account info retrieval (whoami endpoint)
-    client.go             Authenticated HTTP client with auto-refresh
+    client.go             Authenticated HTTP client with connection pooling and auto-refresh
     revisions.go          Store API calls (revisions, releases with pagination)
     cache.go              Cache data structures, gzip read/write, file lookup
     auth_test.go          Tests for macaroon serialization and caveat extraction
     credentials_test.go   Tests for credential storage
-    client_test.go        Tests for refresh detection
+    client_test.go        Tests for client transport and refresh detection
 ```
 
 ## Command Groups
@@ -55,9 +54,7 @@ Commands are organized into three groups displayed in `--help` output. Sorting i
 - **Query:** list, show
 - **Learn:** readme, design, demo
 
-## Authentication
-
-### Version
+## Version
 
 The project produces two binaries (`revmap` and `cache-build`), both receiving the same version via ldflags at build time.
 
@@ -67,7 +64,7 @@ The project produces two binaries (`revmap` and `cache-build`), both receiving t
 
 Cobra's built-in `Version` field provides the `--version` flag automatically.
 
-### Macaroon Scheme
+## Authentication
 
 The Snap Store uses a two-macaroon authentication model:
 
@@ -188,7 +185,7 @@ A standalone binary (`cmd/cache-build/main.go`) that fetches the complete revisi
 
 Built by `make build` alongside the main binary, with the same version injected via ldflags. Supports `-version` to print its version.
 
-**Performance:** The HTTP client is created via `NewClientWithWorkers(n)` which configures a transport with `MaxIdleConnsPerHost` matching the worker count, ensuring TCP/TLS connections are reused across concurrent requests rather than being re-established.
+**Performance:** The HTTP client is created via `NewClientWithWorkers(n)` which configures a transport with `MaxIdleConnsPerHost` set to `n + 10`, ensuring TCP/TLS connections are reused across concurrent requests rather than being re-established.
 
 **Authentication:** If credentials already exist (user ran `revmap login` or `SNAPCRAFT_STORE_CREDENTIALS` is set), they are used directly. Otherwise, `cache-build` checks for `REVMAP_EMAIL` and `REVMAP_PASSWORD` environment variables and performs a non-interactive login via `store.Login(email, password, "")`. The OTP parameter is always empty — the account must not have two-factor authentication enabled. A 2FA-enabled account will return `ErrTwoFactorRequired`, surfaced as `"automatic login failed: two-factor authentication required"`.
 
@@ -267,6 +264,7 @@ All user-facing messages follow consistent conventions:
 | Package | Purpose |
 |---|---|
 | `github.com/spf13/cobra` | CLI framework |
+| `github.com/charmbracelet/glamour` | Terminal markdown rendering (readme/design commands) |
 | `golang.org/x/term` | Secure password input (no echo) |
 | `gopkg.in/macaroon.v1` | Macaroon creation, serialization, binding (matches snapd) |
 

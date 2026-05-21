@@ -17,7 +17,10 @@ func SetReadme(content string) {
 var readmeCmd = &cobra.Command{
 	Use:   "readme",
 	Short: "Display the full README documentation",
-	Args:  cobra.NoArgs,
+	Long: `Display the full README rendered with terminal styling.
+Useful as a quick reference for available commands, flags,
+and workflows without leaving the terminal.`,
+	Args: cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
 		out, err := glamour.Render(embeddedReadme, "auto")
 		if err != nil {

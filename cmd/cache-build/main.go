@@ -4,11 +4,11 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"os"
 	"strconv"
-	"strings"
 	"sync"
 	"time"
 
@@ -133,7 +133,8 @@ func buildCacheForSnap(client *store.Client, snapName string, workers int) error
 			if err != nil {
 				// Skip 404s — some revisions in the releases list
 				// may have been deleted from the revision endpoint.
-				if strings.Contains(err.Error(), "status 404") {
+				var storeErr *store.StoreError
+				if errors.As(err, &storeErr) && storeErr.StatusCode == 404 {
 					mu.Lock()
 					if (idx+1)%100 == 0 {
 						fmt.Printf("    %d/%d details fetched\n", idx+1, len(releases.Revisions))

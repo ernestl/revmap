@@ -49,7 +49,8 @@ with snapcraft export-login output to skip interactive login.`,
 			return nil
 		}
 
-		if store.CredentialsExist() {
+		// Without --export, check if already logged in (file or env var).
+		if loginExportFile == "" && store.CredentialsExist() {
 			fmt.Println("You are already logged in. Run 'revmap logout' first to re-authenticate.")
 			return nil
 		}

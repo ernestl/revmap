@@ -24,6 +24,7 @@ using the snapd snap as an example. Requires authentication.
 The demo walks through various list and show commands,
 pausing between each for review. Use --no-pause to run
 without pauses.`,
+	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		script := findDemoScript()
 		if script == "" {
