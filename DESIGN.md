@@ -14,17 +14,21 @@ revmap/
   cache-snaps.json        Configuration: list of snaps to pre-cache
   cache/                  Generated cache files (gitignored)
   demo.sh                 Interactive demo script (invoked by demo command)
+  test.sh                 Unified test runner (--unit, --static, --all)
   cmd/
-    root.go               Root Cobra command
+    root.go               Root Cobra command, group registration, command ordering
     version.go            Version resolution (ldflags or VCS fallback)
     login.go              Interactive login flow with credential export
     logout.go             Credential removal
+    whoami.go             Account information display
     list.go               Revision listing with filters and table output
     show.go               Single revision detail view
-    whoami.go             Account information display
     cache.go              Cache-build subcommand (pre-build cache generation)
+    design.go             Embedded DESIGN display (rendered via glamour)
+    readme.go             Embedded README display (rendered via glamour)
     demo.go               Demo subcommand (runs demo.sh)
-    readme.go             Embedded README display
+    design.go             Embedded DESIGN display (rendered via glamour)
+    readme.go             Embedded README display (rendered via glamour)
     list_test.go           Tests for list logic
     show_test.go           Tests for show logic
     version_test.go        Tests for version logic
@@ -42,6 +46,14 @@ revmap/
     credentials_test.go   Tests for credential storage
     client_test.go        Tests for refresh detection
 ```
+
+## Command Groups
+
+Commands are organized into three groups displayed in `--help` output. Sorting is disabled (`cobra.EnableCommandSorting = false`) to preserve registration order:
+
+- **Auth:** login, whoami, logout
+- **Query:** list, show
+- **Learn:** readme, design, demo
 
 ## Authentication
 
@@ -89,7 +101,7 @@ The `SNAPCRAFT_STORE_CREDENTIALS` environment variable overrides file-based stor
 
 ### Credential Export
 
-The `login --export <file>` flag writes stored credentials to a file in the snapcraft INI format (`[login.ubuntu.com]\nmacaroon = ...\nunbound_discharge = ...`), compatible with `SNAPCRAFT_STORE_CREDENTIALS`. If the user is already logged in, the existing credentials are exported without re-authenticating. If not yet logged in, the interactive login flow runs first, then the credentials are exported.
+The `login --export <file>` flag writes stored credentials to a file in the snapcraft INI format (`[login.ubuntu.com]\nmacaroon = ...\nunbound_discharge = ...`), compatible with `SNAPCRAFT_STORE_CREDENTIALS`. If on-disk credentials exist (from a prior `revmap login`), they are exported without re-authenticating. If credentials are only available via the `SNAPCRAFT_STORE_CREDENTIALS` environment variable, `--export` forces an interactive login to produce fresh credentials rather than re-exporting the env var. If not yet logged in at all, the interactive login flow runs first, then the credentials are exported.
 
 **Path resolution** (`resolveExportPath`):
 
@@ -149,13 +161,10 @@ Fetches paginated revision data and displays it as a fixed-width table.
 - `--arch` / `-a` -- Case-insensitive architecture match
 - `--status` / `-s` -- Case-insensitive status match
 - `--version` -- Case-insensitive regex match against version string
-- `--build` / `-b` -- Build type classification (preset or custom regex):
-  - `release` -- No `+` or `~` suffix (e.g. `2.75.2`)
-  - `git` -- Has `+g`/`+git` suffix, excluding fips/dirty/pre
-  - `fips` -- Contains `+fips`
-  - `pre` -- Contains `~pre` or `~rc`
-  - `dirty` -- Contains `-dirty`
-  - Any other value -- Treated as a case-insensitive regex matched against the version string
+- `--build` / `-b` -- Build type filter (comma-separated, OR logic):
+  - `release` -- Version contains only digits, dots, and hyphens (e.g. `2.75.2`, `2.75.2-20250521`)
+  - `fips` -- Version contains the word "fips" (e.g. `2.75.2+g307.abc+fips`)
+  - Multiple types can be combined: `-b release,fips`
 
 **Column system** (`resolveColumns`): A registry of column definitions (`allColumns` map), each with a header string, a value extractor function, and a fixed/shrinkable flag. The `--columns` / `-c` flag selects and orders columns.
 
@@ -179,13 +188,15 @@ A standalone binary (`cmd/cache-build/main.go`) that fetches the complete revisi
 
 Built by `make build` alongside the main binary, with the same version injected via ldflags. Supports `-version` to print its version.
 
+**Performance:** The HTTP client is created via `NewClientWithWorkers(n)` which configures a transport with `MaxIdleConnsPerHost` matching the worker count, ensuring TCP/TLS connections are reused across concurrent requests rather than being re-established.
+
 **Authentication:** If credentials already exist (user ran `revmap login` or `SNAPCRAFT_STORE_CREDENTIALS` is set), they are used directly. Otherwise, `cache-build` checks for `REVMAP_EMAIL` and `REVMAP_PASSWORD` environment variables and performs a non-interactive login via `store.Login(email, password, "")`. The OTP parameter is always empty — the account must not have two-factor authentication enabled. A 2FA-enabled account will return `ErrTwoFactorRequired`, surfaced as `"automatic login failed: two-factor authentication required"`.
 
 **Workflow:**
 1. Authenticates (existing credentials or env-var login)
 2. Reads `cache-snaps.json` (searched in cwd, `$SNAP/`, or next to executable)
 3. For each snap: fetches all releases (paginating to completion with `FetchAll: true`)
-4. Concurrently fetches each revision's detail via the revisions endpoint (`--workers` controls parallelism, default 10)
+4. Concurrently fetches each revision's detail via the revisions endpoint (`--workers` controls parallelism, default 30)
 5. Skips revisions that return 404 (some entries in the releases list may have been deleted)
 6. Writes `cache/<snap>.json.gz` — gzip-compressed JSON containing the full `CacheData` struct
 
@@ -202,6 +213,10 @@ type CacheData struct {
 ### demo
 
 Locates and executes `demo.sh` with the current binary path set as `REVMAP`. Searches for the script in `$SNAP/bin/`, next to the executable, or the current working directory. Supports `--no-pause` for non-interactive execution.
+
+### design
+
+Displays the embedded DESIGN.md rendered with glamour (terminal-styled markdown). Useful for understanding revmap's architecture and conventions before contributing, or as context to feed a coding agent.
 
 ## Cache Fallback
 

@@ -13,17 +13,16 @@ import (
 )
 
 var (
-	filterArch    string
-	filterVer     string
-	filterVerRe   *regexp.Regexp
-	filterStatus  string
-	filterBuild   string
-	filterBuildRe *regexp.Regexp
-	since         string
-	until         string
-	limit         int
-	fetchAll      bool
-	columns       string
+	filterArch   string
+	filterVer    string
+	filterVerRe  *regexp.Regexp
+	filterStatus string
+	filterBuild  string
+	since        string
+	until        string
+	limit        int
+	fetchAll     bool
+	columns      string
 )
 
 // column defines a table column with its header and value extractor.
@@ -92,6 +91,18 @@ var allColumns = map[string]column{
 
 const defaultColumns = "revision,version,arch,status,created"
 
+func init() {
+	listCmd.Flags().StringVarP(&filterArch, "arch", "a", "", "filter by architecture")
+	listCmd.Flags().StringVarP(&filterVer, "version", "V", "", "filter by version (regex)")
+	listCmd.Flags().StringVarP(&filterStatus, "status", "s", "", "filter by status")
+	listCmd.Flags().StringVarP(&filterBuild, "build", "b", "", "filter by build type (release, fips — comma-separated)")
+	listCmd.Flags().StringVar(&since, "since", "", "show revisions from this date (Nd/Nw/Nm/Ny or yyyy-mm-dd)")
+	listCmd.Flags().StringVar(&until, "until", "", "show revisions until this date (Nd/Nw/Nm/Ny or yyyy-mm-dd)")
+	listCmd.Flags().IntVarP(&limit, "limit", "n", 0, "maximum number of revisions to fetch")
+	listCmd.Flags().BoolVar(&fetchAll, "all", false, "fetch complete history (no time limit)")
+	listCmd.Flags().StringVarP(&columns, "columns", "c", defaultColumns, "columns to display (comma-separated)")
+}
+
 // columnNames returns the sorted list of available column names.
 func columnNames() string {
 	return "revision, version, arch, status, created, confinement, base, size"
@@ -126,15 +137,6 @@ Examples:
 				return fmt.Errorf("invalid --version regex %q: %v", filterVer, err)
 			}
 			filterVerRe = re
-		}
-
-		// Compile build filter as regex if it's not a preset type.
-		if filterBuild != "" && !isPresetBuildType(filterBuild) {
-			re, err := regexp.Compile("(?i)" + filterBuild)
-			if err != nil {
-				return fmt.Errorf("invalid --build regex %q: %v", filterBuild, err)
-			}
-			filterBuildRe = re
 		}
 
 		// If not authenticated, try to use cached data.
@@ -433,47 +435,29 @@ func matchesFilters(rev store.RevisionEntry) bool {
 	return true
 }
 
-// matchesBuildType checks whether a version string matches the requested
-// build type. Recognised preset types:
-//
-//	release - base version only, no "+" or "~" suffix (e.g. "2.75.2")
-//	git     - has +g or +git suffix, excluding fips/dirty/pre (e.g. "2.75.2+g307.abc")
-//	fips    - has +fips anywhere in the version (e.g. "2.75.2+g307.abc+fips")
-//	pre     - pre-release builds with ~pre or ~rc (e.g. "2.63~pre1+git10.g930660d", "2.54~rc1")
-//	dirty   - builds from uncommitted trees with -dirty (e.g. "2.38+git4.g7de2afe-dirty")
-//
-// Any other value is treated as a custom regex matched against the version.
-func matchesBuildType(version, buildType string) bool {
-	ver := strings.ToLower(version)
-	switch strings.ToLower(buildType) {
-	case "release":
-		return !strings.Contains(ver, "+") && !strings.Contains(ver, "~")
-	case "git":
-		hasGit := strings.Contains(ver, "+g") || strings.Contains(ver, "+git")
-		hasFips := strings.Contains(ver, "+fips")
-		hasDirty := strings.Contains(ver, "-dirty")
-		hasPre := strings.Contains(ver, "~pre") || strings.Contains(ver, "~rc")
-		return hasGit && !hasFips && !hasDirty && !hasPre
-	case "fips":
-		return strings.Contains(ver, "+fips")
-	case "pre":
-		return strings.Contains(ver, "~pre") || strings.Contains(ver, "~rc")
-	case "dirty":
-		return strings.Contains(ver, "-dirty")
-	default:
-		// Custom regex (compiled in RunE).
-		if filterBuildRe != nil {
-			return filterBuildRe.MatchString(version)
-		}
-		return true
-	}
-}
+// releasePattern matches versions containing only digits, dots, and hyphens.
+var releasePattern = regexp.MustCompile(`^[0-9.\-]+$`)
 
-// isPresetBuildType returns true if the value matches a known preset build type.
-func isPresetBuildType(value string) bool {
-	switch strings.ToLower(value) {
-	case "release", "git", "fips", "pre", "dirty":
-		return true
+// matchesBuildType checks whether a version string matches the requested
+// build type filter. Multiple types can be comma-separated (OR logic).
+//
+// Recognised preset types:
+//
+//	release - numeric version with dots and hyphens only (e.g. "2.75.2", "2.75.2-20250521")
+//	fips    - contains the word "fips" anywhere (e.g. "2.75.2+g307.abc+fips")
+func matchesBuildType(version, buildFilter string) bool {
+	ver := strings.ToLower(version)
+	for _, typ := range strings.Split(strings.ToLower(buildFilter), ",") {
+		switch strings.TrimSpace(typ) {
+		case "release":
+			if releasePattern.MatchString(ver) {
+				return true
+			}
+		case "fips":
+			if strings.Contains(ver, "fips") {
+				return true
+			}
+		}
 	}
 	return false
 }

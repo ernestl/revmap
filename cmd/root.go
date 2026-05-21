@@ -38,6 +38,7 @@ func init() {
 	showCmd.GroupID = "query"
 
 	readmeCmd.GroupID = "learn"
+	designCmd.GroupID = "learn"
 	demoCmd.GroupID = "learn"
 
 	rootCmd.AddCommand(loginCmd)
@@ -46,6 +47,7 @@ func init() {
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(showCmd)
 	rootCmd.AddCommand(readmeCmd)
+	rootCmd.AddCommand(designCmd)
 	rootCmd.AddCommand(demoCmd)
 }
 

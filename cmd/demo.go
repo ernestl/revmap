@@ -11,6 +11,10 @@ import (
 
 var noPause bool
 
+func init() {
+	demoCmd.Flags().BoolVar(&noPause, "no-pause", false, "run without pausing between commands")
+}
+
 var demoCmd = &cobra.Command{
 	Use:   "demo",
 	Short: "Run an interactive demo using the snapd snap",

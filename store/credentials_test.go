@@ -159,6 +159,40 @@ func TestCredentialsExistViaEnvVar(t *testing.T) {
 	}
 }
 
+func TestCredentialsExistOnDiskNoFile(t *testing.T) {
+	withTempDataHome(t)
+
+	if CredentialsExistOnDisk() {
+		t.Error("CredentialsExistOnDisk should return false when no file exists")
+	}
+}
+
+func TestCredentialsExistOnDiskIgnoresEnvVar(t *testing.T) {
+	withTempDataHome(t)
+
+	creds := Credentials{Root: "r", Discharge: "d"}
+	data, _ := json.Marshal(creds)
+	encoded := base64.StdEncoding.EncodeToString(data)
+	os.Setenv(CredentialsEnvVar, encoded)
+
+	if CredentialsExistOnDisk() {
+		t.Error("CredentialsExistOnDisk should return false when only env var is set")
+	}
+}
+
+func TestCredentialsExistOnDiskWithFile(t *testing.T) {
+	withTempDataHome(t)
+
+	err := SaveCredentials("root", "discharge")
+	if err != nil {
+		t.Fatalf("SaveCredentials failed: %v", err)
+	}
+
+	if !CredentialsExistOnDisk() {
+		t.Error("CredentialsExistOnDisk should return true when file exists")
+	}
+}
+
 func TestLoadCredentialsFromEnvVar(t *testing.T) {
 	withTempDataHome(t)
 

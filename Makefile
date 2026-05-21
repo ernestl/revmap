@@ -1,6 +1,6 @@
 VERSION ?= $(shell ./version.sh)
 
-.PHONY: build clean test check cache
+.PHONY: build clean test cache
 
 build:
 	go build -ldflags "-X main.version=$(VERSION)" -o revmap .
@@ -11,10 +11,7 @@ clean:
 	rm -rf cache/
 
 test:
-	go test -race ./...
-
-check:
-	./checks.sh
+	./test.sh $(FLAGS)
 
 cache:
 	go run ./cmd/cache-build

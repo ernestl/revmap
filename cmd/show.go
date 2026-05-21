@@ -12,6 +12,10 @@ import (
 
 var fields string
 
+func init() {
+	showCmd.Flags().StringVarP(&fields, "fields", "f", "", "comma-separated list of fields to display")
+}
+
 var showCmd = &cobra.Command{
 	Use:   "show <snap> <revision>",
 	Short: "Show details of a specific snap revision",

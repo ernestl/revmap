@@ -5,7 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"time"
 )
 
 // Client is an HTTP client that automatically attaches store
@@ -14,10 +16,28 @@ type Client struct {
 	httpClient *http.Client
 }
 
-// NewClient creates a new authenticated store client.
+// NewClient creates a new authenticated store client with connection
+// pooling optimised for concurrent requests.
 func NewClient() *Client {
+	return NewClientWithWorkers(30)
+}
+
+// NewClientWithWorkers creates a new authenticated store client with
+// the HTTP transport tuned for the given concurrency level.
+func NewClientWithWorkers(workers int) *Client {
+	transport := &http.Transport{
+		MaxIdleConns:        workers + 10,
+		MaxIdleConnsPerHost: workers + 10,
+		IdleConnTimeout:     90 * time.Second,
+		DialContext: (&net.Dialer{
+			Timeout:   30 * time.Second,
+			KeepAlive: 30 * time.Second,
+		}).DialContext,
+	}
 	return &Client{
-		httpClient: &http.Client{},
+		httpClient: &http.Client{
+			Transport: transport,
+		},
 	}
 }
 

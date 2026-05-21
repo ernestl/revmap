@@ -7,6 +7,35 @@ import (
 	"testing"
 )
 
+func TestNewClientDefaultTransport(t *testing.T) {
+	client := NewClient()
+	transport, ok := client.httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	// Default uses 30 workers, so pool should be 40.
+	if transport.MaxIdleConns != 40 {
+		t.Errorf("MaxIdleConns = %d, want 40", transport.MaxIdleConns)
+	}
+	if transport.MaxIdleConnsPerHost != 40 {
+		t.Errorf("MaxIdleConnsPerHost = %d, want 40", transport.MaxIdleConnsPerHost)
+	}
+}
+
+func TestNewClientWithWorkersTransport(t *testing.T) {
+	client := NewClientWithWorkers(50)
+	transport, ok := client.httpClient.Transport.(*http.Transport)
+	if !ok {
+		t.Fatal("expected *http.Transport")
+	}
+	if transport.MaxIdleConns != 60 {
+		t.Errorf("MaxIdleConns = %d, want 60", transport.MaxIdleConns)
+	}
+	if transport.MaxIdleConnsPerHost != 60 {
+		t.Errorf("MaxIdleConnsPerHost = %d, want 60", transport.MaxIdleConnsPerHost)
+	}
+}
+
 func TestNeedsRefreshWithRefreshCode(t *testing.T) {
 	body := `{"error_list": [{"code": "macaroon-needs-refresh"}]}`
 	resp := &http.Response{

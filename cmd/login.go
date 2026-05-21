@@ -37,8 +37,11 @@ You can also set the SNAPCRAFT_STORE_CREDENTIALS environment variable
 with snapcraft export-login output to skip interactive login.`,
 	Args: cobra.NoArgs,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		// If --export is used with existing credentials, just export.
-		if loginExportFile != "" && store.CredentialsExist() {
+		// If --export is used with existing on-disk credentials, just export.
+		// We intentionally ignore SNAPCRAFT_STORE_CREDENTIALS here so that
+		// --export always produces fresh credentials from an interactive login
+		// rather than re-exporting the environment variable.
+		if loginExportFile != "" && store.CredentialsExistOnDisk() {
 			if err := store.ExportCredentials(loginExportFile); err != nil {
 				return err
 			}

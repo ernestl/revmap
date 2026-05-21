@@ -55,8 +55,10 @@ SNAPCRAFT_STORE_CREDENTIALS:
     revmap login --export credentials.txt
     export SNAPCRAFT_STORE_CREDENTIALS=$(cat credentials.txt)
 
-If already logged in, --export writes the existing credentials
-without re-authenticating.
+If credentials already exist on disk (from a prior login),
+--export writes them without re-authenticating. If credentials
+are only available via SNAPCRAFT_STORE_CREDENTIALS, --export
+forces an interactive login to produce fresh credentials.
 
 When installed as a snap, relative paths are resolved under
 ~/snap/revmap/common/ (the snap's writable user directory)
@@ -129,10 +131,9 @@ Row filters:
     revmap list snapd -s Published      # status
     revmap list snapd --version '2\.75' # version regex
     revmap list snapd -b release        # build type
+    revmap list snapd -b release,fips   # multiple types (OR)
 
-Build types: release, git, fips, pre, dirty.
-Any other value is treated as a custom regex matched against
-the version string (e.g. -b '^\d+\.\d+$').
+Build types: release, fips (comma-separated).
 
 Display options:
 
@@ -176,7 +177,7 @@ fallback.
 Build the offline cache for all snaps in `cache-snaps.json`:
 
     revmap cache-build
-    revmap cache-build --workers 20
+    revmap cache-build --workers 50
 
 Requires authentication. See the Offline Cache section below
 for the full workflow.
@@ -222,7 +223,7 @@ snaps.
 
    Options:
 
-       revmap cache-build --workers 20
+       revmap cache-build --workers 50
 
 3. Build the snap (cache is bundled automatically):
 
@@ -280,10 +281,11 @@ Each `.json.gz` file contains gzip-compressed JSON with:
 ## Building
 
     make              # build both binaries (revmap + cache-build)
-    make test         # run tests with race detector
+    make test         # run unit tests (default)
+    make test FLAGS=--static   # run static analysis
+    make test FLAGS=--all      # run both
     make cache        # build offline cache (requires login)
     make clean        # remove binaries and cache
-    make check        # run checks.sh
 
 `make build` produces two binaries:
 

@@ -18,7 +18,7 @@ jobs:
           go-version-file: go.mod
 
       - run: go install honnef.co/go/tools/cmd/staticcheck@latest
-      - run: ./checks.sh
+      - run: ./test.sh --all
 
       - run: make cache
         env:

@@ -17,8 +17,12 @@ var version string
 //go:embed README.md
 var readme string
 
+//go:embed DESIGN.md
+var design string
+
 func main() {
 	cmd.SetVersion(version)
 	cmd.SetReadme(readme)
+	cmd.SetDesign(design)
 	cmd.Execute()
 }

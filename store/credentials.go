@@ -97,6 +97,13 @@ func CredentialsExist() bool {
 	if os.Getenv(CredentialsEnvVar) != "" {
 		return true
 	}
+	return CredentialsExistOnDisk()
+}
+
+// CredentialsExistOnDisk returns true if credentials are stored in the
+// credentials file, ignoring the SNAPCRAFT_STORE_CREDENTIALS environment
+// variable.
+func CredentialsExistOnDisk() bool {
 	path := credentialsFilePath()
 	_, err := os.Stat(path)
 	return err == nil

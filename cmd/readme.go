@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/charmbracelet/glamour"
 	"github.com/spf13/cobra"
 )
 
@@ -18,6 +19,12 @@ var readmeCmd = &cobra.Command{
 	Short: "Display the full README documentation",
 	Args:  cobra.NoArgs,
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Print(embeddedReadme)
+		out, err := glamour.Render(embeddedReadme, "auto")
+		if err != nil {
+			// Fallback to raw markdown on render failure.
+			fmt.Print(embeddedReadme)
+			return
+		}
+		fmt.Print(out)
 	},
 }

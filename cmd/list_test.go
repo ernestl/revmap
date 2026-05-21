@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"regexp"
 	"strings"
 	"testing"
 	"time"
@@ -317,41 +316,35 @@ func TestMatchesBuildType(t *testing.T) {
 		buildType string
 		want      bool
 	}{
-		// release
+		// release — only digits, dots, hyphens
 		{"2.75.2", "release", true},
+		{"2.75.2-20250521", "release", true},
+		{"1.0.0", "release", true},
 		{"2.75.2+g307.abc", "release", false},
 		{"2.50~pre1", "release", false},
+		{"2.75.2+fips", "release", false},
 
-		// git
-		{"2.75.2+g307.abc", "git", true},
-		{"2.75.2+git307.gabc", "git", true},
-		{"2.75.2+g307.abc+fips", "git", false},
-		{"2.38+git4.g7de2afe-dirty", "git", false},
-		{"2.50~pre1+git10.g930660d", "git", false},
-		{"2.49~rc1+git942.g47f5210", "git", false},
-		{"2.75.2", "git", false},
-
-		// fips
+		// fips — contains the word fips
 		{"2.75.2+g307.abc+fips", "fips", true},
+		{"2.75.2+fips", "fips", true},
+		{"2.75.2-fips-build", "fips", true},
 		{"2.75.2+g307.abc", "fips", false},
+		{"2.75.2", "fips", false},
 
-		// pre (includes ~rc)
-		{"2.50~pre1+git10.g930660d", "pre", true},
-		{"2.34~pre1", "pre", true},
-		{"2.54~rc1", "pre", true},
-		{"2.49~rc1+git942.g47f5210", "pre", true},
-		{"2.75.2", "pre", false},
+		// mixed — comma-separated OR logic
+		{"2.75.2", "release,fips", true},
+		{"2.75.2+fips", "release,fips", true},
+		{"2.75.2+g307.abc", "release,fips", false},
+		{"1.0.0-20250521", "fips,release", true},
 
-		// dirty
-		{"2.38+git4.g7de2afe-dirty", "dirty", true},
-		{"2.75.2+g307.abc", "dirty", false},
-
-		// unknown build type with no regex matches everything
-		{"2.75.2", "unknown", true},
+		// unknown build type matches nothing
+		{"2.75.2", "unknown", false},
+		{"2.75.2+g307.abc", "git", false},
 
 		// case insensitive
 		{"2.75.2", "Release", true},
-		{"2.75.2+G307.ABC+FIPS", "FIPS", true},
+		{"2.75.2+FIPS", "fips", true},
+		{"2.75.2+Fips", "FIPS", true},
 	}
 
 	for _, tt := range tests {
@@ -360,33 +353,6 @@ func TestMatchesBuildType(t *testing.T) {
 			if got != tt.want {
 				t.Errorf("matchesBuildType(%q, %q) = %v, want %v",
 					tt.version, tt.buildType, got, tt.want)
-			}
-		})
-	}
-}
-
-func TestMatchesBuildTypeCustomRegex(t *testing.T) {
-	// Set the package-level regex to simulate --build with a custom pattern.
-	filterBuildRe = regexp.MustCompile(`(?i)\+g\d+\..*\+fips`)
-	defer func() { filterBuildRe = nil }()
-
-	tests := []struct {
-		version string
-		want    bool
-	}{
-		{"2.75.2+g307.abc+fips", true},
-		{"2.75.2+g42.xyz+FIPS", true},
-		{"2.75.2+g307.abc", false},
-		{"2.75.2", false},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.version, func(t *testing.T) {
-			// Use a non-preset build type to trigger regex path.
-			got := matchesBuildType(tt.version, "custom-pattern")
-			if got != tt.want {
-				t.Errorf("matchesBuildType(%q, custom regex) = %v, want %v",
-					tt.version, got, tt.want)
 			}
 		})
 	}

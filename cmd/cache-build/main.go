@@ -22,7 +22,7 @@ var version string
 
 func main() {
 	showVersion := flag.Bool("version", false, "print version and exit")
-	workers := flag.Int("workers", 10, "number of concurrent revision detail fetches")
+	workers := flag.Int("workers", 30, "number of concurrent revision detail fetches")
 	flag.Parse()
 
 	if *showVersion {
@@ -84,7 +84,7 @@ func run(workers int) error {
 		return nil
 	}
 
-	client := store.NewClient()
+	client := store.NewClientWithWorkers(workers)
 
 	for i, snapName := range snaps {
 		fmt.Printf("[%d/%d] Caching %s...\n", i+1, len(snaps), snapName)
@@ -136,7 +136,7 @@ func buildCacheForSnap(client *store.Client, snapName string, workers int) error
 				if strings.Contains(err.Error(), "status 404") {
 					mu.Lock()
 					if (idx+1)%100 == 0 {
-						fmt.Printf("    %d/%d details fetched\n", len(details), len(releases.Revisions))
+						fmt.Printf("    %d/%d details fetched\n", idx+1, len(releases.Revisions))
 					}
 					mu.Unlock()
 					return
@@ -151,14 +151,17 @@ func buildCacheForSnap(client *store.Client, snapName string, workers int) error
 
 			mu.Lock()
 			details[revStr] = info.Raw
-			if (idx+1)%100 == 0 || idx+1 == len(releases.Revisions) {
-				fmt.Printf("    %d/%d details fetched\n", len(details), len(releases.Revisions))
+			if (idx+1)%100 == 0 {
+				fmt.Printf("    %d/%d details fetched\n", idx+1, len(releases.Revisions))
 			}
 			mu.Unlock()
 		}(rev.Revision, i)
 	}
 
 	wg.Wait()
+
+	// Always show the final count.
+	fmt.Printf("    %d/%d details fetched\n", len(details), len(releases.Revisions))
 
 	if fetchErr != nil {
 		return fetchErr
