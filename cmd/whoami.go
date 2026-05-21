@@ -33,6 +33,10 @@ including email, username, and registered snaps.`,
 			fmt.Printf("expires:  %s\n", expires.Format("2006-01-02"))
 		}
 
+		if perms, err := store.CredentialsPermissions(); err == nil && len(perms) > 0 {
+			fmt.Printf("perms:    %s\n", strings.Join(perms, ", "))
+		}
+
 		if len(info.Snaps) == 0 {
 			fmt.Printf("snaps:    (none)\n")
 		} else {

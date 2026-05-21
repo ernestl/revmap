@@ -111,6 +111,41 @@ func CredentialsSource() string {
 	return credentialsFilePath()
 }
 
+// CredentialsPermissions returns the permissions (ACL) encoded in the
+// root macaroon's first-party caveats. It looks for caveats in the
+// format "<location>|acl|[...]".
+// Returns nil if no permissions caveat is found.
+func CredentialsPermissions() ([]string, error) {
+	creds, err := LoadCredentials()
+	if err != nil {
+		return nil, err
+	}
+
+	m, err := MacaroonDeserialize(creds.Root)
+	if err != nil {
+		return nil, fmt.Errorf("cannot deserialize root macaroon: %w", err)
+	}
+
+	for _, caveat := range m.Caveats() {
+		if caveat.Location != "" {
+			continue // skip third-party caveats
+		}
+		if strings.Contains(caveat.Id, "|acl|") {
+			parts := strings.SplitN(caveat.Id, "|acl|", 2)
+			if len(parts) != 2 {
+				continue
+			}
+			var perms []string
+			if err := json.Unmarshal([]byte(parts[1]), &perms); err != nil {
+				continue
+			}
+			return perms, nil
+		}
+	}
+
+	return nil, nil
+}
+
 // CredentialsExpiry returns the expiry time of the stored credentials
 // by inspecting the root macaroon's first-party caveats. It checks for:
 //   - "time-before <timestamp>" (standard macaroon format)
