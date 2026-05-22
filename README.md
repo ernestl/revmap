@@ -1,5 +1,8 @@
 # revmap
 
+[![revmap](https://snapcraft.io/revmap/badge.svg)](https://snapcraft.io/revmap)
+[![revmap](https://snapcraft.io/revmap/trending.svg?name=0)](https://snapcraft.io/revmap)
+
 A CLI tool for inspecting the revision and version history
 of snaps published in the Snap Store (https://snapcraft.io).
 
